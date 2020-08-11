@@ -1,0 +1,26 @@
+type: object
+additionalProperties: false
+    
+definitions:
+  short_label: &short_label
+    type: string
+    minLength: 1
+    maxLength: 64
+  long_label: &long_label
+    type: string
+    minLength: 1
+    maxLength: 128
+  uri: &uri
+    type: string
+    format: uri
+
+properties:
+  name: *short_label
+  organisation: *long_label
+  website: *uri
+  bio:
+    type: string
+  joined:
+    type: number
+    minimum: 2000
+    maximum: 2100  

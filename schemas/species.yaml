@@ -1,0 +1,48 @@
+type: object
+additionalProperties: false
+  
+definitions:
+  short_label: &short_label
+    type: string
+    minLength: 1
+    maxLength: 64
+  long_label: &long_label
+    type: string
+    minLength: 1
+    maxLength: 128
+  slug: &slug
+    type: string
+    minLength: 1
+    maxLength: 64
+    pattern: '^[a-zA-Z0-9-_.]+$'
+
+properties:
+  created_by: *short_label
+  updated_by: *short_label
+  common_names:
+    type: array
+    items: *long_label
+  synonyms:
+    type: array
+    items: *long_label
+  classification:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      properties:
+        rank: *slug
+        name: *short_label
+  categories:
+    type: array
+    items: *slug
+  features:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      properties:
+        feature: *slug
+        description: *slug
+  id:
+    type: object

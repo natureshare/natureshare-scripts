@@ -1,0 +1,50 @@
+type: object
+additionalProperties: false
+  
+definitions:
+  short_label: &short_label
+    type: string
+    minLength: 1
+    maxLength: 64
+  long_label: &long_label
+    type: string
+    minLength: 1
+    maxLength: 128
+  uri: &uri
+    type: string
+    format: uri
+  latitude: &latitude
+    type: number
+    description: Latitude
+    minimum: -90
+    maximum: 90
+  longitude: &longitude
+    type: number
+    description: Longitude
+    minimum: -180
+    maximum: 180
+
+properties:
+  featured:
+    type: boolean
+  title: *long_label
+  organisation: *long_label
+  website: *uri
+  description:
+    type: string
+  latitude: *latitude
+  longitude: *longitude
+  location_name: *long_label
+  cover_photo_url: *uri
+  admins:
+    type: array
+    items: *short_label
+  members:
+    type: array
+    items: *short_label
+  species:
+    type: array
+    items: *long_label
+  extra_items:
+    type: array
+    items: *long_label

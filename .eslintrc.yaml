@@ -1,0 +1,28 @@
+ignorePatterns:
+  - '*.json'
+  - '*.css'
+extends:
+  - standard
+  - airbnb-base
+  - prettier
+parserOptions:
+  ecmaVersion: 2020
+  sourceType: module
+  allowImportExportEverywhere: false
+env:
+  es6: true
+  node: true
+rules:
+  indent:
+    - error
+    - 4
+  no-console: 'off'
+  import/extensions: 'off'
+  no-underscore-dangle: 'off'
+plugins:
+  - standard
+  - import
+  - prettier
+settings:
+  react:
+    version: detect

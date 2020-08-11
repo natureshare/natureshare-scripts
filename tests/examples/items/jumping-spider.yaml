@@ -1,0 +1,10 @@
+--- #natureshare.org
+id:
+  - name: Apricia jovialis
+    common: Australian Jumping Spider
+latitude: -37.827167
+longitude: 145.048366
+description: Location is approximate.
+collections: [spiders]
+license: CC BY 4.0
+...
