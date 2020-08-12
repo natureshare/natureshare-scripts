@@ -12,7 +12,7 @@
     "license": "",
     "dependencies": {
         "dotenv": "^8.2.0",
-        "dropbox": "^5.2.0",
+        "dropbox": "^5.2.1",
         "exif": "^0.6.0",
         "feed": "^4.2.1",
         "feedparser": "^2.2.10",

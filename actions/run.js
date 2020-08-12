@@ -28,8 +28,7 @@ const schemas = _mapValues(
         species: '',
         item: '',
     },
-    (v, k) =>
-        yaml.safeLoad(fs.readFileSync(path.join('.', 'schemas', `${v || k}.yaml`))),
+    (v, k) => yaml.safeLoad(fs.readFileSync(path.join('.', 'schemas', `${v || k}.yaml`))),
 );
 
 const writeYaml = (filePath, obj, schema) => {
