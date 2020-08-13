@@ -37,3 +37,11 @@ export const parseItemDescription = (str) => {
     }
     return null;
 };
+
+export const slugify = (str) =>
+    str
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9-_.~]+/g, '')
+        .replace(/_+/g, '_')
+        .replace(/^_/, '')
+        .replace(/_$/, '');

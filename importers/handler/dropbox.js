@@ -10,20 +10,25 @@ import mkdirp from 'mkdirp';
 import moment from 'moment';
 import yaml from 'js-yaml';
 import _uniq from 'lodash/uniq.js';
+import _uniqBy from 'lodash/uniqBy.js';
+import _sortBy from 'lodash/sortBy.js';
 import {
     _clean,
     coordValue,
     validateItem,
     parseItemDescription,
     locationIsValid,
+    slugify,
 } from './utils.js';
 
 dotenv.config();
 
 const contentFilePath = process.env.CONTENT_FILE_PATH;
-const contentHost = process.env.CONTENT_HOST;
+const contentHostDev = process.env.CONTENT_HOST_DEV; // TODO
 
-const imageFileRegExp = /\.(jpg|jpeg)$/;
+const imageFileRegExp = /\.(jpg|jpeg)$/i;
+
+const forceUpdate = false;
 
 export default async ({ username, oauth }) => {
     const dropbox = new dbx.Dropbox({
@@ -34,23 +39,38 @@ export default async ({ username, oauth }) => {
     const root = await dropbox.filesListFolder({ path: '' });
 
     for (const rootEntry of root.entries.filter((i) => i['.tag'] === 'folder')) {
-        const dirName = path.basename(rootEntry.path_lower);
+        const dirName = slugify(path.basename(rootEntry.path_lower));
 
         const folder = await dropbox.filesListFolder({ path: rootEntry.path_lower });
+        console.log(dirName, '::', folder.entries.length);
+
+        // folder.entries.forEach(i => console.log(i.path_lower));
 
         for (const entry of folder.entries
             .filter((i) => imageFileRegExp.test(i.path_lower))
             .slice(0, 100)) {
             console.log(entry.path_lower);
 
-            const fileName = path.basename(entry.path_lower, path.extname(entry.path_lower));
-
-            const dataFileRegExp = new RegExp(`^/${dirName}/${fileName}.(txt|yml|yaml)`);
+            const dataFileRegExp = new RegExp(
+                `^${rootEntry.path_lower}/${
+                    path.basename(entry.path_lower, path.extname(entry.path_lower)).split('~', 1)[0]
+                }.(txt|yml|yaml)`,
+            );
 
             const dataEntry = folder.entries.filter((i) => dataFileRegExp.test(i.path_lower))[0];
 
+            if (!dataEntry) {
+                console.log('   ', 'Not Found!');
+            }
+
             if (dataEntry) {
+                console.log('   ', 'Found:', dataEntry.path_lower);
+
                 const dirPath = path.join(contentFilePath, username, 'items', 'dropbox', dirName);
+
+                const fileName = slugify(
+                    path.basename(dataEntry.path_lower, path.extname(dataEntry.path_lower)),
+                );
 
                 const filePath = path.join(dirPath, `${fileName}.yaml`);
 
@@ -63,6 +83,7 @@ export default async ({ username, oauth }) => {
                 );
 
                 if (
+                    forceUpdate ||
                     !existingItem.updated_at ||
                     updatedAt.isAfter(moment(existingItem.updated_at))
                 ) {
@@ -108,23 +129,27 @@ export default async ({ username, oauth }) => {
                         const href = shared.url;
                         const originalUrl = shared.url.replace('dl=0', 'dl=1');
 
-                        const thumbnailPath = path.join(dirPath, `${fileName}.jpg`);
+                        const thumbnailFileName = slugify(
+                            path.basename(entry.path_lower, path.extname(entry.path_lower)),
+                        );
+                        const thumbnailPath = path.join(dirPath, `${thumbnailFileName}.jpg`);
                         const thumbnailUrl = new URL(
                             [
                                 username,
                                 'items',
                                 'dropbox',
-                                `${createdAt.year()}`,
-                                `${fileName}.jpg`,
+                                `${dirName}`,
+                                `${thumbnailFileName}.jpg`,
                             ].join('/'),
-                            contentHost,
+                            contentHostDev, // TODO
                         ).href;
 
                         if (
                             !existingItem ||
                             !existingItem.photos ||
                             !existingItem.photos[0] ||
-                            existingItem.photos[0].thumbnail_url !== thumbnailUrl
+                            existingItem.photos.filter((i) => i.thumbnail_url === thumbnailUrl)
+                                .length === 0
                         ) {
                             console.log('-->', thumbnailPath);
 
@@ -139,6 +164,17 @@ export default async ({ username, oauth }) => {
                                 fs.writeFileSync(thumbnailPath, thumbnail.fileBinary);
                             }
                         }
+
+                        const photo = _clean({
+                            source: 'dropbox',
+                            id: entry.name,
+                            href,
+                            datetime: timeTaken ? moment(timeTaken).toISOString(true) : null,
+                            width: dimensions ? dimensions.width : null,
+                            height: dimensions ? dimensions.height : null,
+                            thumbnail_url: thumbnailUrl,
+                            original_url: originalUrl,
+                        });
 
                         const item = _clean({
                             datetime: timeTaken ? moment(timeTaken).toISOString(true) : null,
@@ -159,20 +195,10 @@ export default async ({ username, oauth }) => {
                                 ...(existingItem.collections || []),
                                 ...(partialItem.collections || []),
                             ]),
-                            photos: [
-                                _clean({
-                                    source: 'dropbox',
-                                    id: entry.name,
-                                    href,
-                                    datetime: timeTaken
-                                        ? moment(timeTaken).toISOString(true)
-                                        : null,
-                                    width: dimensions ? dimensions.width : null,
-                                    height: dimensions ? dimensions.height : null,
-                                    thumbnail_url: thumbnailUrl,
-                                    original_url: originalUrl,
-                                }),
-                            ],
+                            photos: _sortBy(
+                                _uniqBy([...(existingItem.photos || []), photo], 'id'),
+                                'id',
+                            ),
                             created_at: createdAt.toISOString(),
                             updated_at: updatedAt.toISOString(),
                         });

@@ -82,7 +82,7 @@ const parseFeedItem = (username, data) => {
             if (partialItem.longitude) partialItem.longitude = coordValue(partialItem.longitude);
 
             const item = _clean({
-                datetime: dateTaken.toISOString(true),
+                datetime: moment(dateTaken).toISOString(true),
                 latitude:
                     data.latitude !== '0' && data.longitude !== '0'
                         ? coordValue(data.latitude)
