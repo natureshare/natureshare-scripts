@@ -11,9 +11,25 @@ export const _clean = (obj) =>
     );
 
 export const locationIsValid = (obj) =>
-    obj && obj.latitude && obj.longitude && obj.latitude !== '0' && obj.longitude !== '0';
+    obj &&
+    parseFloat(obj.latitude) &&
+    parseFloat(obj.longitude) &&
+    parseFloat(obj.latitude) !== 0 &&
+    parseFloat(obj.longitude) !== 0;
 
 export const coordValue = (v) => Math.round(parseFloat(v) * 1000000) / 1000000;
+
+export const getValidLocation = (obj) => {
+    if (obj && typeof obj === 'object') {
+        if (locationIsValid(obj)) {
+            return {
+                latitude: coordValue(obj.latitude),
+                longitude: coordValue(obj.longitude),
+            };
+        }
+    }
+    return {};
+};
 
 const validator = new jsonschema.Validator();
 const itemSchema = yaml.safeLoad(fs.readFileSync('./schemas/item.yaml'));

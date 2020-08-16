@@ -24,7 +24,7 @@ export const sortFeedItems = (items) =>
             'date_published',
             'date_modified',
             '_meta.itemCount',
-            '_meta.photoCount',
+            '_meta.imageCount',
             '_meta.videoCount',
             '_meta.audioCount',
         ],

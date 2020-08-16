@@ -9,7 +9,9 @@ import fs from 'fs';
 import mkdirp from 'mkdirp';
 import path from 'path';
 import _uniq from 'lodash/uniq.js';
-import { _clean, coordValue, validateItem, parseItemDescription } from './utils.js';
+import _uniqBy from 'lodash/uniqBy.js';
+import _sortBy from 'lodash/sortBy.js';
+import { _clean, validateItem, parseItemDescription, getValidLocation } from './utils.js';
 
 dotenv.config();
 
@@ -18,29 +20,40 @@ const oAuthSecret = process.env.OAUTH_FLICKR_SECRET;
 
 const contentFilePath = process.env.CONTENT_FILE_PATH;
 
-const parseFeedItem = (username, data) => {
-    // console.log(data.id);
+const parseFeedItem = (username, data, titleMap) => {
+    if (data.media_status === 'ready') {
+        console.log('   ', data.title);
 
-    if (data.media_status === 'ready' && data.description && data.description._content) {
-        const partialItem = parseItemDescription(striptags(data.description._content));
+        const createdAt = moment.unix(data.dateupload);
+        const updatedAt = moment.unix(data.lastupdate);
+
+        const dirPath = path.join(
+            contentFilePath,
+            username,
+            'items',
+            'flickr',
+            `${createdAt.year()}`,
+        );
+
+        let fileName = data.id;
+        let partialItem = null;
+
+        if (data.description && data.description._content) {
+            partialItem = parseItemDescription(striptags(data.description._content));
+        }
+
+        if (!partialItem && data.title && /.+~[0-9]+$/.test(data.title)) {
+            const targetId = titleMap[data.title.split('~', 1)[0]];
+            if (targetId && fs.existsSync(path.join(dirPath, `${targetId}.yaml`))) {
+                fileName = targetId;
+                partialItem = {};
+            }
+        }
 
         if (partialItem) {
-            // console.log(data);
+            const filePath = path.join(dirPath, `${fileName}.yaml`);
 
-            const createdAt = moment.unix(data.dateupload);
-            const updatedAt = moment.unix(data.lastupdate);
-
-            const dirPath = path.join(
-                contentFilePath,
-                username,
-                'items',
-                'flickr',
-                `${createdAt.year()}`,
-            );
-
-            const filePath = path.join(dirPath, `${data.id}.yaml`);
-
-            console.log('    -->', filePath);
+            console.log('      -->', filePath);
 
             const existingItem = fs.existsSync(filePath)
                 ? yaml.safeLoad(fs.readFileSync(filePath))
@@ -77,29 +90,26 @@ const parseFeedItem = (username, data) => {
                       ]
                     : [];
 
-            if (partialItem.latitude) partialItem.latitude = coordValue(partialItem.latitude);
-
-            if (partialItem.longitude) partialItem.longitude = coordValue(partialItem.longitude);
+            const location = {
+                latitude: null,
+                longitude: null,
+                ...getValidLocation(existingItem),
+                ...getValidLocation(data),
+                ...getValidLocation(partialItem),
+            };
 
             const item = _clean({
-                datetime: moment(dateTaken).toISOString(true),
-                latitude:
-                    data.latitude !== '0' && data.longitude !== '0'
-                        ? coordValue(data.latitude)
-                        : undefined,
-                longitude:
-                    data.latitude !== '0' && data.longitude !== '0'
-                        ? coordValue(data.longitude)
-                        : undefined,
                 ...existingItem,
                 ...partialItem,
+                datetime: dateTaken || partialItem.datetime || existingItem.datetime,
+                photos: _sortBy(_uniqBy([...(existingItem.photos || []), ...photos], 'id'), 'id'),
+                videos: _sortBy(_uniqBy([...(existingItem.videos || []), ...videos], 'id'), 'id'),
+                ...location,
                 tags: _uniq([...(existingItem.tags || []), ...(partialItem.tags || []), 'flickr']),
                 collections: _uniq([
                     ...(existingItem.collections || []),
                     ...(partialItem.collections || []),
                 ]),
-                photos,
-                videos,
                 created_at: createdAt.toISOString(true),
                 updated_at: updatedAt.toISOString(true),
             });
@@ -132,7 +142,14 @@ export const getPublicPhotos = async (username, api, userId) => {
             per_page: 100,
         });
 
-        response.body.photos.photo.forEach((data) => parseFeedItem(username, data));
+        const titleMap = response.body.photos.photo.reduce(
+            (acc, i) => ({ ...acc, [i.title]: i.id }),
+            {},
+        );
+
+        _sortBy(response.body.photos.photo, 'title').forEach((data) =>
+            parseFeedItem(username, data, titleMap),
+        );
     } catch (err) {
         console.log(err);
     }
