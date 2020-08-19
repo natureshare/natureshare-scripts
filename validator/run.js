@@ -5,8 +5,8 @@ import yaml from 'js-yaml';
 import glob from 'glob';
 import path from 'path';
 import jsonschema from 'jsonschema';
-import dotenv from 'dotenv';
 import _mapValues from 'lodash/mapValues.js';
+import dotenv from '../utils/dotenv.js';
 
 dotenv.config();
 

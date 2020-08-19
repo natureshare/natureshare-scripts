@@ -2,7 +2,6 @@
 
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv';
 import fetch from 'isomorphic-unfetch';
 import yaml from 'js-yaml';
 import _sortBy from 'lodash/sortBy.js';
@@ -11,12 +10,17 @@ import _uniq from 'lodash/uniq.js';
 import jsonschema from 'jsonschema';
 import mkdirp from 'mkdirp';
 import _mapValues from 'lodash/mapValues.js';
+import dotenv from '../utils/dotenv.js';
+import importer from './importer.js';
+import { assert } from './utils.js';
 
 dotenv.config();
 
 const cwd = process.env.CONTENT_FILE_PATH;
 const apiHost = process.env.API_HOST;
 const contentHost = process.env.CONTENT_HOST;
+
+assert({ cwd, apiHost, contentHost });
 
 const validator = new jsonschema.Validator();
 const feedSchema = JSON.parse(fs.readFileSync('./schemas/feed.json'));
@@ -46,7 +50,13 @@ const writeYaml = (filePath, obj, schema) => {
 };
 
 const actions = {
-    itemComment: ({ id, date_published: date, author, _meta: meta, content_text: yamlText }) => {
+    itemComment: async ({
+        id,
+        date_published: date,
+        author,
+        _meta: meta,
+        content_text: yamlText,
+    }) => {
         const { comment } = yaml.safeLoad(yamlText);
         const { name: sender } = author;
         const { target } = meta;
@@ -67,7 +77,7 @@ const actions = {
         }
     },
 
-    itemToCollection: ({ author, _meta: meta, content_text: yamlText }) => {
+    itemToCollection: async ({ author, _meta: meta, content_text: yamlText }) => {
         const { collection: name } = yaml.safeLoad(yamlText);
         const { name: sender } = author;
         const { target } = meta;
@@ -82,6 +92,10 @@ const actions = {
             collection.extra_items = _uniq([...(collection.extra_items || []), targetFile]).sort();
             writeYaml(filePath, collection, schemas.collection);
         }
+    },
+
+    runUserMediaImport: async ({ author, _meta: meta }) => {
+        await importer(author.name, meta.target);
     },
 };
 
@@ -117,7 +131,7 @@ const run = async () => {
             const usernames = [];
             const items = _sortBy(feed.items, 'date_published');
 
-            items.forEach((item) => {
+            for (const item of items) {
                 console.log('action:', item.title);
 
                 if (Object.keys(actions).includes(item.title)) {
@@ -129,11 +143,11 @@ const run = async () => {
 
                     if (item._meta.recipient) usernames.push(item._meta.recipient);
 
-                    actions[item.title](item);
+                    await actions[item.title](item);
 
                     console.log('---');
                 }
-            });
+            }
 
             fs.writeFileSync(
                 lastUpdateFilePath,

@@ -3,10 +3,10 @@
 import path from 'path';
 import fs from 'fs';
 import yaml from 'js-yaml';
-import dotenv from 'dotenv';
 import _uniq from 'lodash/uniq.js';
 import _isArray from 'lodash/isArray.js';
 import _truncate from 'lodash/truncate.js';
+import dotenv from '../../utils/dotenv.js';
 import omitNull from './omitNull.js';
 import { coord } from './utils.js';
 

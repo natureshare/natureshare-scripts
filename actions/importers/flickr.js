@@ -1,6 +1,5 @@
 /* global process */
 
-import dotenv from 'dotenv';
 import Flickr from 'flickr-sdk';
 import moment from 'moment';
 import yaml from 'js-yaml';
@@ -11,14 +10,17 @@ import path from 'path';
 import _uniq from 'lodash/uniq.js';
 import _uniqBy from 'lodash/uniqBy.js';
 import _sortBy from 'lodash/sortBy.js';
+import dotenv from '../../utils/dotenv.js';
 import { _clean, validateItem, parseItemDescription, getValidLocation } from './utils.js';
+import { assert } from '../utils.js';
 
 dotenv.config();
 
 const oAuthKey = process.env.OAUTH_FLICKR_KEY;
 const oAuthSecret = process.env.OAUTH_FLICKR_SECRET;
-
 const contentFilePath = process.env.CONTENT_FILE_PATH;
+
+assert({ oAuthKey, oAuthSecret, contentFilePath });
 
 const parseFeedItem = (username, data, titleMap) => {
     if (data.media_status === 'ready') {

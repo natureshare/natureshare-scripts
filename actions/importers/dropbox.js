@@ -1,7 +1,6 @@
 /* global process URL */
 // https://dropbox.github.io/dropbox-sdk-js/Dropbox.html
 
-import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import dbx from 'dropbox';
 import path from 'path';
@@ -12,6 +11,7 @@ import yaml from 'js-yaml';
 import _uniq from 'lodash/uniq.js';
 import _uniqBy from 'lodash/uniqBy.js';
 import _sortBy from 'lodash/sortBy.js';
+import dotenv from '../../utils/dotenv.js';
 import {
     _clean,
     coordValue,

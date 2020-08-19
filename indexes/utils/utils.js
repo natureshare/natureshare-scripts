@@ -1,8 +1,8 @@
 /* global process URL */
 
-import dotenv from 'dotenv';
 import path from 'path';
 import _orderBy from 'lodash/orderBy.js';
+import dotenv from '../../utils/dotenv.js';
 
 dotenv.config();
 

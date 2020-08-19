@@ -4,9 +4,9 @@ import path from 'path';
 import glob from 'glob';
 import fs from 'fs';
 import yaml from 'js-yaml';
-import dotenv from 'dotenv';
 import _pickBy from 'lodash/pickBy.js';
 import moment from 'moment';
+import dotenv from '../utils/dotenv.js';
 import { writeFiles, averageCoord } from './utils/writeFiles.js';
 import { sortFeedItems } from './utils/utils.js';
 

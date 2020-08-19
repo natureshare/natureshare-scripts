@@ -1,6 +1,6 @@
 type: object
 additionalProperties: false
-  
+
 definitions:
   boolean: &bool
     type: boolean
@@ -59,7 +59,10 @@ definitions:
             source:
               type: string
             url: *uri
-        
+
+required:
+  - license
+
 properties:
   id:
     type: array
@@ -96,8 +99,7 @@ properties:
   non_identifying_photo: *bool
   photo_datetime_used: *bool
   photo_geotag_used: *bool
-  photo_quality:
-    type: *short_label
+  photo_quality: *short_label
   created_at:
     type: string
     format: date-time
@@ -133,5 +135,5 @@ properties:
   license:
     type: string
     minLength: 1
-    pattern: ^CC\sBY\s
-  
+    pattern: ^CC\sBY\s\d+\.\d+
+

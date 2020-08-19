@@ -3,11 +3,11 @@
 import path from 'path';
 import mkdirp from 'mkdirp';
 import jsonschema from 'jsonschema';
-import dotenv from 'dotenv';
 import fs from 'fs';
 import jsonfeedToRSS from 'jsonfeed-to-rss';
 import jsonfeedToAtom from 'jsonfeed-to-atom';
 import _range from 'lodash/range.js';
+import dotenv from '../../utils/dotenv.js';
 import omitNull from './omitNull.js';
 import { sortFeedItems } from './utils.js';
 

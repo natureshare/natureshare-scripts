@@ -3,10 +3,10 @@
 import path from 'path';
 import glob from 'glob';
 import fs from 'fs';
-import dotenv from 'dotenv';
 import _startCase from 'lodash/startCase.js';
 import _pickBy from 'lodash/pickBy.js';
 import _mapValues from 'lodash/mapValues.js';
+import dotenv from '../utils/dotenv.js';
 import { writeFiles, writeFilesForEach } from './utils/writeFiles.js';
 import loadItem from './utils/loadItem.js';
 import { userUrl, dirStr, sortFeedItems } from './utils/utils.js';
