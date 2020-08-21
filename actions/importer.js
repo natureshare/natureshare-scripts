@@ -5,7 +5,7 @@ import jose from 'node-jose';
 import dotenv from '../utils/dotenv.js';
 import { assert } from './utils.js';
 import flickr from './importers/flickr.js';
-// import dropbox from './importers/dropbox.js';
+import dropbox from './importers/dropbox.js';
 // import google from './importers/google.js';
 
 dotenv.config();
@@ -24,7 +24,7 @@ async function decrypt(jwe) {
 
 const importers = {
     flickr,
-    // dropbox,
+    dropbox,
     // google,
 };
 

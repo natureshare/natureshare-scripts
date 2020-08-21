@@ -115,15 +115,13 @@ const run = async () => {
     );
 
     if (response.ok) {
-        console.log('ok');
+        console.log('HTTP OK.');
 
         const feed = await response.json();
 
         feed.feed_url = new URL(path.join('.', 'actions.json'), contentHost).href;
 
         validator.validate(feed, feedSchema, { throwError: true });
-
-        console.log('valid');
 
         if (feed.items.length === 0) {
             throw Error('No updates.');

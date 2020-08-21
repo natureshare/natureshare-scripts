@@ -24,7 +24,7 @@ import {
 dotenv.config();
 
 const contentFilePath = process.env.CONTENT_FILE_PATH;
-const contentHostDev = process.env.CONTENT_HOST_DEV; // TODO
+const photosHost = process.env.PHOTOS_HOST;
 
 const imageFileRegExp = /\.(jpg|jpeg)$/i;
 
@@ -141,7 +141,7 @@ export default async ({ username, oauth }) => {
                                 `${dirName}`,
                                 `${thumbnailFileName}.jpg`,
                             ].join('/'),
-                            contentHostDev, // TODO
+                            photosHost,
                         ).href;
 
                         if (
