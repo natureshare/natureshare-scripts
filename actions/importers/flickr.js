@@ -11,7 +11,7 @@ import _uniq from 'lodash/uniq.js';
 import _uniqBy from 'lodash/uniqBy.js';
 import _sortBy from 'lodash/sortBy.js';
 import dotenv from '../../utils/dotenv.js';
-import { _clean, validateItem, parseItemDescription, getValidLocation } from './utils.js';
+import { _clean, itemIsValid, parseItemDescription, getValidLocation } from './utils.js';
 import { assert } from '../utils.js';
 
 dotenv.config();
@@ -23,6 +23,8 @@ const contentFilePath = process.env.CONTENT_FILE_PATH;
 assert({ oAuthKey, oAuthSecret, contentFilePath });
 
 const parseFeedItem = (username, data, titleMap) => {
+    // console.log(data);
+
     if (data.media_status === 'ready') {
         console.log('   ', data.title);
 
@@ -92,43 +94,49 @@ const parseFeedItem = (username, data, titleMap) => {
                       ]
                     : [];
 
-            const location = {
+            const itemLocation = {
                 latitude: null,
                 longitude: null,
-                ...getValidLocation(existingItem),
-                ...getValidLocation(data),
-                ...getValidLocation(partialItem),
+                ...getValidLocation(existingItem, false),
+                ...getValidLocation(data, true),
+                ...getValidLocation(partialItem, false),
             };
 
             const item = _clean({
                 ...existingItem,
                 ...partialItem,
+                ...itemLocation,
                 datetime: dateTaken || partialItem.datetime || existingItem.datetime,
+                photo_datetime_used: Boolean(dateTaken),
+                tags: _uniq(
+                    [
+                        ...(existingItem.tags || []),
+                        ...(partialItem.tags || []),
+                        ...data.tags.split(' '),
+                        'flickr',
+                    ]
+                        .filter(Boolean)
+                        .sort(),
+                ),
+                collections: _uniq(
+                    [...(existingItem.collections || []), ...(partialItem.collections || [])]
+                        .filter(Boolean)
+                        .sort(),
+                ),
                 photos: _sortBy(_uniqBy([...(existingItem.photos || []), ...photos], 'id'), 'id'),
                 videos: _sortBy(_uniqBy([...(existingItem.videos || []), ...videos], 'id'), 'id'),
-                ...location,
-                tags: _uniq([...(existingItem.tags || []), ...(partialItem.tags || []), 'flickr']),
-                collections: _uniq([
-                    ...(existingItem.collections || []),
-                    ...(partialItem.collections || []),
-                ]),
                 created_at: createdAt.toISOString(true),
                 updated_at: updatedAt.toISOString(true),
             });
 
-            const doc = yaml.safeDump(item, {
-                lineWidth: 1000,
-                noRefs: true,
-            });
-
-            // console.log('---');
-            // console.log(doc);
-
-            validateItem(item, true);
-
-            mkdirp.sync(dirPath);
-
-            fs.writeFileSync(filePath, doc);
+            if (itemIsValid(item)) {
+                const doc = yaml.safeDump(item, {
+                    lineWidth: 1000,
+                    noRefs: true,
+                });
+                mkdirp.sync(dirPath);
+                fs.writeFileSync(filePath, doc);
+            }
         }
     }
 };
@@ -140,7 +148,8 @@ export const getPublicPhotos = async (username, api, userId) => {
         const response = await api.people.getPublicPhotos({
             user_id: userId,
             safe_search: 1,
-            extras: 'description, date_upload, last_update, date_taken, geo, media, url_m, url_o',
+            extras:
+                'description, date_upload, last_update, date_taken, geo, media, url_m, url_o, tags',
             per_page: 100,
         });
 

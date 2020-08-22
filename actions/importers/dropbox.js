@@ -12,14 +12,7 @@ import _uniq from 'lodash/uniq.js';
 import _uniqBy from 'lodash/uniqBy.js';
 import _sortBy from 'lodash/sortBy.js';
 import dotenv from '../../utils/dotenv.js';
-import {
-    _clean,
-    coordValue,
-    validateItem,
-    parseItemDescription,
-    locationIsValid,
-    slugify,
-} from './utils.js';
+import { _clean, itemIsValid, parseItemDescription, slugify, getValidLocation } from './utils.js';
 
 dotenv.config();
 
@@ -48,7 +41,8 @@ export default async ({ username, oauth }) => {
 
         for (const entry of folder.entries
             .filter((i) => imageFileRegExp.test(i.path_lower))
-            .slice(0, 100)) {
+            .slice(0, 100)
+            .sort()) {
             console.log(entry.path_lower);
 
             const dataFileRegExp = new RegExp(
@@ -176,25 +170,40 @@ export default async ({ username, oauth }) => {
                             original_url: originalUrl,
                         });
 
+                        const itemLocation = {
+                            latitude: null,
+                            longitude: null,
+                            ...getValidLocation(existingItem, false),
+                            ...getValidLocation(location, true),
+                            ...getValidLocation(partialItem, false),
+                        };
+
                         const item = _clean({
-                            datetime: timeTaken ? moment(timeTaken).toISOString(true) : null,
-                            latitude: locationIsValid(location)
-                                ? coordValue(location.latitude)
-                                : undefined,
-                            longitude: locationIsValid(location)
-                                ? coordValue(location.longitude)
-                                : undefined,
                             ...existingItem,
                             ...partialItem,
-                            tags: _uniq([
-                                ...(existingItem.tags || []),
-                                ...(partialItem.tags || []),
-                                'dropbox',
-                            ]),
-                            collections: _uniq([
-                                ...(existingItem.collections || []),
-                                ...(partialItem.collections || []),
-                            ]),
+                            ...itemLocation,
+                            datetime:
+                                (timeTaken ? moment(timeTaken).toISOString(true) : null) ||
+                                partialItem.datetime ||
+                                existingItem.datetime,
+                            photo_datetime_used: Boolean(timeTaken),
+                            tags: _uniq(
+                                [
+                                    ...(existingItem.tags || []),
+                                    ...(partialItem.tags || []),
+                                    'dropbox',
+                                ]
+                                    .filter(Boolean)
+                                    .sort(),
+                            ),
+                            collections: _uniq(
+                                [
+                                    ...(existingItem.collections || []),
+                                    ...(partialItem.collections || []),
+                                ]
+                                    .filter(Boolean)
+                                    .sort(),
+                            ),
                             photos: _sortBy(
                                 _uniqBy([...(existingItem.photos || []), photo], 'id'),
                                 'id',
@@ -203,14 +212,14 @@ export default async ({ username, oauth }) => {
                             updated_at: updatedAt.toISOString(),
                         });
 
-                        const doc = yaml.safeDump(item, {
-                            lineWidth: 1000,
-                            noRefs: true,
-                        });
-
-                        validateItem(item, true);
-                        mkdirp.sync(dirPath);
-                        fs.writeFileSync(filePath, doc);
+                        if (itemIsValid(item)) {
+                            const doc = yaml.safeDump(item, {
+                                lineWidth: 1000,
+                                noRefs: true,
+                            });
+                            mkdirp.sync(dirPath);
+                            fs.writeFileSync(filePath, doc);
+                        }
                     }
                 }
             }

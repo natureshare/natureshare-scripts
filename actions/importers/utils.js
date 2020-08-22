@@ -19,25 +19,35 @@ export const locationIsValid = (obj) =>
 
 export const coordValue = (v) => Math.round(parseFloat(v) * 1000000) / 1000000;
 
-export const getValidLocation = (obj) => {
+/* eslint-disable camelcase */
+export const getValidLocation = (obj, photo_geotag_used) => {
     if (obj && typeof obj === 'object') {
         if (locationIsValid(obj)) {
             return {
                 latitude: coordValue(obj.latitude),
                 longitude: coordValue(obj.longitude),
+                photo_geotag_used,
             };
         }
     }
     return {};
 };
+/* eslint-enable camelcase */
 
 const validator = new jsonschema.Validator();
 const itemSchema = yaml.safeLoad(fs.readFileSync('./schemas/item.yaml'));
 
-export const validateItem = (obj, throwError) =>
-    validator.validate(obj, itemSchema, {
+export const validateItem = (obj, throwError) => {
+    const result = validator.validate(obj, itemSchema, {
         throwError,
     });
+    if (result.errors.length !== 0) {
+        console.error(result.errors);
+    }
+    return result;
+};
+
+export const itemIsValid = (obj) => validateItem(obj, false).errors.length === 0;
 
 export const parseItemDescription = (str) => {
     if (str && str.length !== 0 && str.substr('--- #natureshare.org') !== -1) {
