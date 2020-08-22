@@ -39,10 +39,12 @@ export default async ({ username, oauth }) => {
 
         // folder.entries.forEach(i => console.log(i.path_lower));
 
-        for (const entry of folder.entries
-            .filter((i) => imageFileRegExp.test(i.path_lower))
-            .slice(0, 100)
-            .sort()) {
+        const itemEntries = _sortBy(
+            folder.entries.filter((i) => imageFileRegExp.test(i.path_lower)).slice(0, 100),
+            'path_lower',
+        );
+
+        for (const entry of itemEntries) {
             console.log(entry.path_lower);
 
             const dataFileRegExp = new RegExp(
@@ -55,9 +57,7 @@ export default async ({ username, oauth }) => {
 
             if (!dataEntry) {
                 console.log('   ', 'Not Found!');
-            }
-
-            if (dataEntry) {
+            } else {
                 console.log('   ', 'Found:', dataEntry.path_lower);
 
                 const dirPath = path.join(contentFilePath, username, 'items', 'dropbox', dirName);
@@ -76,10 +76,28 @@ export default async ({ username, oauth }) => {
                     [entry.server_modified, dataEntry.server_modified].sort()[1],
                 );
 
+                const thumbnailFileName = slugify(
+                    path.basename(entry.path_lower, path.extname(entry.path_lower)),
+                );
+                const thumbnailPath = path.join(dirPath, `${thumbnailFileName}.jpg`);
+                const thumbnailUrl = new URL(
+                    [username, 'items', 'dropbox', `${dirName}`, `${thumbnailFileName}.jpg`].join(
+                        '/',
+                    ),
+                    photosHost,
+                ).href;
+
+                const isNewImageFile =
+                    !existingItem.photos ||
+                    !existingItem.photos[0] ||
+                    existingItem.photos.filter((i) => i.thumbnail_url === thumbnailUrl).length ===
+                        0;
+
                 if (
                     forceUpdate ||
                     !existingItem.updated_at ||
-                    updatedAt.isAfter(moment(existingItem.updated_at))
+                    updatedAt.isAfter(moment(existingItem.updated_at)) ||
+                    isNewImageFile
                 ) {
                     console.log('-->', filePath);
 
@@ -123,28 +141,7 @@ export default async ({ username, oauth }) => {
                         const href = shared.url;
                         const originalUrl = shared.url.replace('dl=0', 'dl=1');
 
-                        const thumbnailFileName = slugify(
-                            path.basename(entry.path_lower, path.extname(entry.path_lower)),
-                        );
-                        const thumbnailPath = path.join(dirPath, `${thumbnailFileName}.jpg`);
-                        const thumbnailUrl = new URL(
-                            [
-                                username,
-                                'items',
-                                'dropbox',
-                                `${dirName}`,
-                                `${thumbnailFileName}.jpg`,
-                            ].join('/'),
-                            photosHost,
-                        ).href;
-
-                        if (
-                            !existingItem ||
-                            !existingItem.photos ||
-                            !existingItem.photos[0] ||
-                            existingItem.photos.filter((i) => i.thumbnail_url === thumbnailUrl)
-                                .length === 0
-                        ) {
+                        if (isNewImageFile) {
                             console.log('-->', thumbnailPath);
 
                             const thumbnail = await dropbox.filesGetThumbnail({
