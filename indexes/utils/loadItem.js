@@ -70,11 +70,11 @@ export default (userDir, f) => {
         date_published: createdAt,
         date_modified: updatedAt,
         tags: [
-            ...(_isArray(idNames) ? idNames.map((i) => `id=${i}`) : ['id=Unidentified']),
+            ...(_isArray(idNames) ? idNames.map((i) => `id~${i}`) : ['id~Unidentified']),
             ...(_isArray(tags) && tags.length !== 0
                 ? _uniq(tags)
                       .sort()
-                      .map((i) => `tag=${i}`)
+                      .map((i) => `tag~${i}`)
                 : []),
         ],
         _geo: {

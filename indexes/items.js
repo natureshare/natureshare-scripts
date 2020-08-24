@@ -60,7 +60,7 @@ const run = (userDir) => {
         writeFiles({
             userDir,
             subDir: 'items',
-            _title: 'Items',
+            _title: 'Observations',
             feedItems: sortFeedItems(feedItems),
         });
 

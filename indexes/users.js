@@ -84,7 +84,7 @@ glob.sync(path.join('*'), { cwd })
     });
 
 writeFiles({
-    userDir: appName,
+    userDir: 'All Users',
     subDir: '../..', // bit of hack
     appView: 'profile',
     feedItems: sortFeedItems(items),
