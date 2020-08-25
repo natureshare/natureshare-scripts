@@ -32,7 +32,7 @@ const build = (userDir) => {
     console.log(userDir);
 
     const collectionsDir = path.join(cwd, userDir, 'collections');
-    const collectionsIndexDir = path.join(cwd, userDir, '_index', 'collections');
+    const collectionsIndexDir = path.join(cwd, userDir, 'collections');
 
     const collectionsIndex = {};
 
@@ -116,7 +116,6 @@ const build = (userDir) => {
                 const f = path.join(
                     cwd,
                     m,
-                    '_index',
                     'collections',
                     c,
                     `index${page === 1 ? '' : `_${page}`}.json`,
@@ -160,7 +159,6 @@ const build = (userDir) => {
 
             const filePath = path.join(
                 userDir,
-                '_index',
                 'collections',
                 dirStr(c),
                 'aggregate',
@@ -197,7 +195,7 @@ if (process.argv.length === 3) {
     glob.sync('*', { cwd })
         .filter(
             (f) =>
-                f !== '_index' && f !== '_scripts' && fs.lstatSync(path.join(cwd, f)).isDirectory(),
+                f && f[0] !== '.' && f[0] !== '_' && fs.lstatSync(path.join(cwd, f)).isDirectory(),
         )
         .slice(0, 100000)
         .forEach(build);

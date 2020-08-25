@@ -63,16 +63,18 @@ export const writeFiles = ({
     _homePageUrl,
     _userUrl,
 }) => {
-    const fileDir = path.join(userDir, '_index', subDir);
+    const fileDir = path.join(userDir, subDir);
     const feedUrl = new URL(path.join('.', fileDir, 'index.json'), contentHost).href;
     const homePageUrl = `${appHost}items?i=${encodeURIComponent(feedUrl)}`;
     const userUrl = `${appHost}items?i=${encodeURIComponent(
-        new URL(path.join('.', userDir, '_index', 'items', 'index.json'), contentHost).href,
+        new URL(path.join('.', userDir, 'items', 'index.json'), contentHost).href,
     )}`;
 
     mkdirp.sync(path.join(cwd, fileDir));
 
-    _range(1, Math.ceil(feedItems.length / PER_PAGE) + 1).forEach((page) => {
+    const pageCount = Math.ceil(feedItems.length / PER_PAGE);
+
+    _range(1, pageCount + 1).forEach((page) => {
         const fileName = `index${page === 1 ? '' : `_${page}`}`;
 
         const feed = {
@@ -85,12 +87,19 @@ export const writeFiles = ({
             },
             home_page_url: _homePageUrl || homePageUrl,
             feed_url: feedUrl,
-            next_url: new URL(path.join('.', fileDir, `index_${page + 1}.json`), contentHost).href,
+            ...(page < pageCount
+                ? {
+                      next_url: new URL(
+                          path.join('.', fileDir, `index_${page + 1}.json`),
+                          contentHost,
+                      ).href,
+                  }
+                : {}),
             items: feedItems.slice((page - 1) * PER_PAGE, page * PER_PAGE),
             _meta: {
                 itemCount: feedItems.length,
                 pageNumber: page,
-                pageCount: Math.ceil(feedItems.length / PER_PAGE),
+                pageCount,
             },
         };
 

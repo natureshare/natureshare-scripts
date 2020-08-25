@@ -85,7 +85,7 @@ if (process.argv.length === 3) {
     glob.sync('*', { cwd })
         .filter(
             (f) =>
-                f !== '_index' && f !== '_scripts' && fs.lstatSync(path.join(cwd, f)).isDirectory(),
+                f && f[0] !== '.' && f[0] !== '_' && fs.lstatSync(path.join(cwd, f)).isDirectory(),
         )
         .slice(0, 100000)
         .forEach(run);

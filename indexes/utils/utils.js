@@ -11,7 +11,7 @@ const contentHost = process.env.CONTENT_HOST || 'https://files.natureshare.org.a
 
 export const userUrl = (userDir) =>
     `${appHost}items?i=${encodeURIComponent(
-        new URL(path.join('.', userDir, '_index', 'items', 'index.json'), contentHost),
+        new URL(path.join('.', userDir, 'items', 'index.json'), contentHost),
     )}`;
 
 export const dirStr = (i) => i.toLowerCase().replace(/\s/g, '_');

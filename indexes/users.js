@@ -20,7 +20,9 @@ const contentHost = process.env.CONTENT_HOST || 'https://files.natureshare.org.a
 const items = [];
 
 glob.sync(path.join('*'), { cwd })
-    .filter((f) => f !== '_index' && fs.lstatSync(path.join(cwd, f)).isDirectory())
+    .filter(
+        (f) => f && f[0] !== '.' && f[0] !== '_' && fs.lstatSync(path.join(cwd, f)).isDirectory(),
+    )
     .slice(0, 100000)
     .forEach((username) => {
         const filePath = path.join(username, 'profile.yaml');
@@ -31,10 +33,7 @@ glob.sync(path.join('*'), { cwd })
         } else {
             const profile = yaml.safeLoad(fs.readFileSync(path.join(cwd, filePath)));
 
-            const id = new URL(
-                path.join('.', username, '_index', 'items', 'index.json'),
-                contentHost,
-            ).href;
+            const id = new URL(path.join('.', username, 'items', 'index.json'), contentHost).href;
 
             let image = null;
             let datePublished = (profile.joined
@@ -45,7 +44,7 @@ glob.sync(path.join('*'), { cwd })
             let itemCount = 0;
             let coordinates = null;
 
-            const indexFile = path.join(cwd, username, '_index', 'items', 'index.json');
+            const indexFile = path.join(cwd, username, 'items', 'index.json');
 
             if (fs.existsSync(indexFile)) {
                 const { items: recentItems, _meta: meta } = JSON.parse(fs.readFileSync(indexFile));
@@ -85,7 +84,7 @@ glob.sync(path.join('*'), { cwd })
 
 writeFiles({
     userDir: 'All Users',
-    subDir: '../..', // bit of hack
+    subDir: '..', // bit of hack
     appView: 'profile',
     feedItems: sortFeedItems(items),
     _title: appName,
