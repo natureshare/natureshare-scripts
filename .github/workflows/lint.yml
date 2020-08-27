@@ -1,0 +1,22 @@
+name: Lint
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - master
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v2
+
+      - name: NPM Install
+        run: npm ci
+
+      - name: Linter
+        run: npm run linter
