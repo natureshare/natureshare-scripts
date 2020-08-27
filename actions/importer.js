@@ -6,6 +6,7 @@ import dotenv from '../utils/dotenv.js';
 import { assert } from './utils.js';
 import flickr from './importers/flickr.js';
 import dropbox from './importers/dropbox.js';
+import inaturalist from './importers/inaturalist.js';
 // import google from './importers/google.js';
 
 dotenv.config();
@@ -25,6 +26,7 @@ async function decrypt(jwe) {
 const importers = {
     flickr,
     dropbox,
+    inaturalist,
     // google,
 };
 
@@ -46,7 +48,7 @@ export default async function run(username, provider) {
                 if (provider === 'all') {
                     for (const p in user.data.oauth) {
                         if (p in importers) {
-                            console.log(' ', p);
+                            console.log('===', p, '===');
                             await importers[p]({
                                 username: user.name,
                                 oauth: await decrypt(user.data.oauth[p]),
