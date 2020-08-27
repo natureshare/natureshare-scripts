@@ -27,7 +27,7 @@
         "moment": "^2.27.0",
         "node-fetch": "^2.6.0",
         "node-jose": "^1.1.4",
-        "sharp": "^0.25.4",
+        "sharp": "^0.26.0",
         "striptags": "^3.1.1",
         "togpx": "^0.5.4",
         "tokml": "^0.4.0",
