@@ -1,6 +1,6 @@
 # NatureShare
 
-https://natureshare.org.au
+https://natureshare.org
 
 ## Scripts
 

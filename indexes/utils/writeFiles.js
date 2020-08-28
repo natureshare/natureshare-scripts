@@ -14,7 +14,7 @@ import { sortFeedItems } from './utils.js';
 dotenv.config();
 
 const cwd = process.env.CONTENT_FILE_PATH;
-const appHost = process.env.APP_HOST || 'https://natureshare.org.au';
+const appHost = process.env.APP_HOST;
 const contentHost = process.env.CONTENT_HOST;
 
 const validator = new jsonschema.Validator();
