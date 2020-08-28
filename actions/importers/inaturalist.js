@@ -1,16 +1,23 @@
+// https://www.inaturalist.org/oauth/applications/492
+
 /* global process URL URLSearchParams */
 /* eslint-disable camelcase */
 
 import fetch from 'node-fetch';
 import path from 'path';
+import glob from 'glob';
 import fs from 'fs';
 import mkdirp from 'mkdirp';
 import moment from 'moment';
 import yaml from 'js-yaml';
+import FormData from 'form-data';
 import dotenv from '../../utils/dotenv.js';
 import { _clean, itemIsValid, getValidLocation } from './utils.js';
 
 dotenv.config();
+
+const appHost = process.env.APP_HOST || 'https://natureshare.org.au/';
+const contentHost = process.env.CONTENT_HOST || 'https://files.natureshare.org.au/';
 
 const contentFilePath = process.env.CONTENT_FILE_PATH;
 
@@ -149,9 +156,147 @@ async function userImportObservations({ username, userId, token }) {
     } while (idAbove && quota > 0);
 }
 
-async function userSync({ username, userId, token }) {
+async function userUploadPhoto({ observationId, photoUrl, token }) {
+    console.log('-- Uploading: ', photoUrl);
+
+    const photoResponse = await fetch(photoUrl);
+
+    if (photoResponse.ok) {
+        const contentType = photoResponse.headers.get('content-type');
+        const contentLength = photoResponse.headers.get('content-length');
+
+        if (!/^image\//.test(contentType)) {
+            console.error('Wrong type', contentType);
+        } else if (contentLength > 1000000) {
+            console.error('Too large', contentLength);
+        } else {
+            const buffer = await photoResponse.buffer();
+
+            if (buffer) {
+                const form = new FormData();
+
+                form.append('observation_photo[observation_id]', observationId);
+
+                form.append('file', buffer, {
+                    contentType,
+                    name: 'file',
+                    filename: path.basename(new URL(photoUrl).pathname),
+                });
+
+                const response = await fetch(new URL('/v1/observation_photos', apiHost).href, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        ...form.getHeaders(),
+                    },
+                    body: form,
+                });
+
+                if (!response.ok) {
+                    console.error(response.status);
+                    console.error(await response.text());
+                }
+
+                return response.status;
+            }
+        }
+    }
+
+    return null;
+}
+
+async function userUploadObservations({ username, userId, token }) {
+    console.log(username, userId, token);
+
+    const itemsDir = path.join(process.env.CONTENT_FILE_PATH, username, 'items');
+
+    if (fs.existsSync(itemsDir)) {
+        const itemsSubDirs = glob
+            .sync('*', { cwd: itemsDir })
+            .filter(
+                (f) =>
+                    f && f !== 'inaturalist' && fs.lstatSync(path.join(itemsDir, f)).isDirectory(),
+            );
+
+        for (const subdir of itemsSubDirs.slice(0, 1)) {
+            for (const f of glob
+                .sync(path.join(subdir, '*', '*.yaml'), { cwd: itemsDir })
+                .slice(0, 1)) {
+                console.log(f);
+                const item = yaml.safeLoad(fs.readFileSync(path.join(itemsDir, f)));
+
+                if (
+                    (item.photos && item.photos.length !== 0) ||
+                    (item.id && item.id.length === 1)
+                ) {
+                    const url = new URL('/item', appHost);
+                    url.search = new URLSearchParams({
+                        i: new URL(path.join('/', username, 'items', f), contentHost).href,
+                    });
+                    console.log(url.href);
+
+                    const body = {
+                        observation: _clean({
+                            species_guess:
+                                (item.id && typeof item.id[0] === 'string' && item.id[0]) ||
+                                item.id[0].name,
+                            observed_on_string: moment(item.datetime).toISOString(true),
+                            // time_zone: as above?
+                            description: item.description,
+                            tag_list: item.tags && item.tags.join(','),
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                            observation_field_values_attributes: [
+                                {
+                                    observation_field_id: 11952, // NatureShare URL
+                                    value: url.href,
+                                },
+                            ],
+                        }),
+                    };
+                    console.log(body);
+
+                    const response = await fetch(new URL('/v1/observations', apiHost).href, {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        method: 'post',
+                        body: JSON.stringify(body),
+                    });
+
+                    if (response.ok) {
+                        const observation = await response.json();
+                        console.log('Observation id:', observation.id); // or use uuid?
+
+                        if (item.photos) {
+                            for (const { thumbnail_url: photoUrl } of item.photos) {
+                                if (photoUrl) {
+                                    console.log(
+                                        await userUploadPhoto({
+                                            userId,
+                                            token,
+                                            observationId: observation.id,
+                                            photoUrl,
+                                        }),
+                                    );
+                                }
+                            }
+                        }
+                    } else {
+                        console.error(response.status);
+                        console.error(await response.text());
+                    }
+                }
+            }
+        }
+    }
+}
+
+export async function userSync({ username, userId, token }) {
     console.log('userId', userId);
     await userImportObservations({ username, userId, token });
+    await userUploadObservations({ username, userId, token });
     return true;
 }
 
