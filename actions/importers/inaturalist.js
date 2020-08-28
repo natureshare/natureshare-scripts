@@ -1,4 +1,9 @@
 // https://www.inaturalist.org/oauth/applications/492
+// https://www.inaturalist.org/pages/api+reference#post-observations
+// https://www.inaturalist.org/pages/api+reference#post-observation_photos
+// https://api.inaturalist.org/v1/docs/#!/Observations/post_observations
+// https://api.inaturalist.org/v1/docs/#/Observation_Photos
+// https://github.com/inaturalist/inaturalist/blob/master/app/controllers/observation_photos_controller.rb
 
 /* global process URL URLSearchParams */
 /* eslint-disable camelcase */
@@ -211,6 +216,12 @@ async function userUploadObservations({ username, userId, token }) {
     const itemsDir = path.join(process.env.CONTENT_FILE_PATH, username, 'items');
 
     if (fs.existsSync(itemsDir)) {
+        const indexFilePath = path.join(itemsDir, 'inaturalist.yaml');
+        const index = fs.existsSync(indexFilePath)
+            ? yaml.safeLoad(fs.readFileSync(indexFilePath))
+            : {};
+        let quota = 10;
+
         const itemsSubDirs = glob
             .sync('*', { cwd: itemsDir })
             .filter(
@@ -218,75 +229,86 @@ async function userUploadObservations({ username, userId, token }) {
                     f && f !== 'inaturalist' && fs.lstatSync(path.join(itemsDir, f)).isDirectory(),
             );
 
-        for (const subdir of itemsSubDirs.slice(0, 1)) {
-            for (const f of glob
-                .sync(path.join(subdir, '*', '*.yaml'), { cwd: itemsDir })
-                .slice(0, 1)) {
-                console.log(f);
-                const item = yaml.safeLoad(fs.readFileSync(path.join(itemsDir, f)));
+        for (const subdir of itemsSubDirs) {
+            if (quota <= 0) break;
+            for (const f of glob.sync(path.join(subdir, '*', '*.yaml'), { cwd: itemsDir })) {
+                if (quota <= 0) break;
+                if (index[f] === undefined) {
+                    console.log(f);
+                    quota -= 1;
+                    index[f] = null;
 
-                if (
-                    (item.photos && item.photos.length !== 0) ||
-                    (item.id && item.id.length === 1)
-                ) {
-                    const url = new URL('/item', appHost);
-                    url.search = new URLSearchParams({
-                        i: new URL(path.join('/', username, 'items', f), contentHost).href,
-                    });
-                    console.log(url.href);
+                    const item = yaml.safeLoad(fs.readFileSync(path.join(itemsDir, f)));
 
-                    const body = {
-                        observation: _clean({
-                            species_guess:
-                                (item.id && typeof item.id[0] === 'string' && item.id[0]) ||
-                                item.id[0].name,
-                            observed_on_string: moment(item.datetime).toISOString(true),
-                            // time_zone: as above?
-                            description: item.description,
-                            tag_list: item.tags && item.tags.join(','),
-                            latitude: item.latitude,
-                            longitude: item.longitude,
-                            observation_field_values_attributes: [
-                                {
-                                    observation_field_id: 11952, // NatureShare URL
-                                    value: url.href,
-                                },
-                            ],
-                        }),
-                    };
-                    console.log(body);
+                    if (
+                        (item.photos && item.photos.length !== 0) ||
+                        (item.id && item.id.length === 1)
+                    ) {
+                        const url = new URL('/item', appHost);
+                        url.search = new URLSearchParams({
+                            i: new URL(path.join('/', username, 'items', f), contentHost).href,
+                        });
+                        console.log(url.href);
 
-                    const response = await fetch(new URL('/v1/observations', apiHost).href, {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                            'Content-Type': 'application/json',
-                        },
-                        method: 'post',
-                        body: JSON.stringify(body),
-                    });
+                        const body = {
+                            observation: _clean({
+                                species_guess:
+                                    (item.id &&
+                                        ((typeof item.id[0] === 'string' && item.id[0]) ||
+                                            item.id[0].name)) ||
+                                    null,
+                                observed_on_string: moment(item.datetime).toISOString(true),
+                                // time_zone: as above?
+                                description: item.description,
+                                tag_list: item.tags && item.tags.join(','),
+                                latitude: item.latitude,
+                                longitude: item.longitude,
+                                observation_field_values_attributes: [
+                                    {
+                                        observation_field_id: 11952, // NatureShare URL
+                                        value: url.href,
+                                    },
+                                ],
+                            }),
+                        };
+                        console.log(body);
 
-                    if (response.ok) {
-                        const observation = await response.json();
-                        console.log('Observation id:', observation.id); // or use uuid?
+                        const response = await fetch(new URL('/v1/observations', apiHost).href, {
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                'Content-Type': 'application/json',
+                            },
+                            method: 'post',
+                            body: JSON.stringify(body),
+                        });
 
-                        if (item.photos) {
-                            for (const { thumbnail_url: photoUrl } of item.photos) {
-                                if (photoUrl) {
-                                    console.log(
-                                        await userUploadPhoto({
-                                            userId,
-                                            token,
-                                            observationId: observation.id,
-                                            photoUrl,
-                                        }),
-                                    );
+                        if (response.ok) {
+                            const observation = await response.json();
+                            console.log('Observation id:', observation.id); // or use uuid?
+                            index[f] = observation.id;
+
+                            if (item.photos) {
+                                for (const { thumbnail_url: photoUrl } of item.photos) {
+                                    if (photoUrl) {
+                                        console.log(
+                                            await userUploadPhoto({
+                                                userId,
+                                                token,
+                                                observationId: observation.id,
+                                                photoUrl,
+                                            }),
+                                        );
+                                    }
                                 }
                             }
+                        } else {
+                            index[f] = false;
+                            console.error(response.status);
+                            console.error(await response.text());
                         }
-                    } else {
-                        console.error(response.status);
-                        console.error(await response.text());
                     }
+
+                    fs.writeFileSync(indexFilePath, yaml.safeDump(index));
                 }
             }
         }
