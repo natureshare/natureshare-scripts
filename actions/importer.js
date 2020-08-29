@@ -6,7 +6,7 @@ import dotenv from '../utils/dotenv.js';
 import { assert } from './utils.js';
 import flickr from './importers/flickr.js';
 import dropbox from './importers/dropbox.js';
-import inaturalist from './importers/inaturalist.js';
+// import inaturalist from './importers/inaturalist.js';
 // import google from './importers/google.js';
 
 dotenv.config();
@@ -26,7 +26,7 @@ async function decrypt(jwe) {
 const importers = {
     flickr,
     dropbox,
-    inaturalist,
+    // inaturalist,
     // google,
 };
 

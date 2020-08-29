@@ -6,8 +6,8 @@ import dotenv from '../../utils/dotenv.js';
 
 dotenv.config();
 
-const appHost = process.env.APP_HOST || 'https://natureshare.org.au/';
-const contentHost = process.env.CONTENT_HOST || 'https://files.natureshare.org.au/';
+const appHost = process.env.APP_HOST;
+const contentHost = process.env.CONTENT_HOST;
 
 export const userUrl = (userDir) =>
     `${appHost}items?i=${encodeURIComponent(
