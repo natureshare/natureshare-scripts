@@ -180,9 +180,70 @@ const build = (userDir) => {
                     coordinates: coord([collection.longitude, collection.latitude]),
                 }),
                 _meta: omitNull({
+                    name: c,
                     featured: collection.featured || null,
                     idCount: uniqTags.filter((t) => _startsWith(t, 'id=')).length,
                     tagCount: uniqTags.filter((t) => _startsWith(t, 'tag=')).length,
+                }),
+            });
+        },
+    });
+};
+
+const indexAll = () => {
+    let index = {};
+
+    glob.sync(path.join('*', 'collections', 'index.json'), { cwd }).forEach((f) => {
+        // console.log(f);
+
+        JSON.parse(fs.readFileSync(path.join(cwd, f))).items.forEach(({ title, ...collection }) => {
+            const { name } = collection._meta;
+            // console.log(' ->', name, '-', title);
+
+            if (index[name] === undefined) index[name] = [];
+
+            index[name].push({
+                title: f.split(path.sep)[0],
+                ...collection,
+            });
+        });
+    });
+
+    console.log(Object.keys(index).length, ' collections');
+
+    index = _mapValues(index, (i) => sortFeedItems(i));
+
+    Object.keys(index).forEach((name) => {
+        writeFiles({
+            userDir: '_collections',
+            subDir: name,
+            feedItems: index[name],
+            _title: _startCase(name),
+            _authorName: 'All Collections',
+            _userUrl: `${appHost}collections`,
+            _description: `All users for [${name}]`,
+            _itemCountKey: 'userCount',
+        });
+    });
+
+    writeFilesIndex({
+        index,
+        userDir: '_collections',
+        subDir: '.',
+        _title: 'All Collections',
+        _authorName: 'All Collections',
+        _userUrl: `${appHost}collections`,
+        metaCb: (name) => {
+            const id = new URL(path.join('.', '_collections', name, 'index.json'), contentHost)
+                .href;
+            return omitNull({
+                id,
+                url: `${appHost}items?i=${encodeURIComponent(id)}`,
+                title: _startCase(name),
+                _meta: omitNull({
+                    featured: false, // TODO
+                    itemCount: 0,
+                    userCount: index[name].length,
                 }),
             });
         },
@@ -199,4 +260,5 @@ if (process.argv.length === 3) {
         )
         .slice(0, 100000)
         .forEach(build);
+    indexAll();
 }

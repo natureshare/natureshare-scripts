@@ -61,6 +61,7 @@ export const writeFiles = ({
     _title,
     _description,
     _homePageUrl,
+    _authorName,
     _userUrl,
 }) => {
     const fileDir = path.join(userDir, subDir);
@@ -82,7 +83,7 @@ export const writeFiles = ({
             title: _title || fileDir,
             description: _description || '',
             author: {
-                name: userDir,
+                name: _authorName || userDir,
                 url: _userUrl || userUrl,
             },
             home_page_url: _homePageUrl || homePageUrl,
@@ -165,7 +166,15 @@ export const writeFilesForEach = ({ index, userDir, subDirCb, titleCb, descripti
         });
     });
 
-export const writeFilesIndex = ({ index, userDir, subDir, _title, metaCb }) => {
+export const writeFilesIndex = ({
+    index,
+    userDir,
+    subDir,
+    _title,
+    _authorName,
+    _userUrl,
+    metaCb,
+}) => {
     const feedItems = sortFeedItems(
         Object.keys(index).map((i) => {
             const { _geo, _meta, ...mixin } = metaCb ? metaCb(i) : {};
@@ -193,6 +202,8 @@ export const writeFilesIndex = ({ index, userDir, subDir, _title, metaCb }) => {
         userDir,
         subDir,
         _title,
+        _authorName,
+        _userUrl,
         feedItems,
     });
 };
