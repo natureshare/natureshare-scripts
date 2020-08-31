@@ -17,10 +17,15 @@ const apiDataPrivateKey = process.env.API_DATA_PRIVATE_KEY;
 
 assert({ apiHost, apiToken, apiDataPrivateKey });
 
-async function decrypt(jwe) {
+async function decrypt(jwe, failWith) {
     const privateKey = await jose.JWK.asKey(apiDataPrivateKey);
-    const obj = await jose.JWE.createDecrypt(privateKey).decrypt(jwe);
-    return JSON.parse(obj.plaintext.toString());
+    try {
+        const obj = await jose.JWE.createDecrypt(privateKey).decrypt(jwe);
+        return JSON.parse(obj.plaintext.toString());
+    } catch (e) {
+        console.error();
+        return failWith;
+    }
 }
 
 const importers = {
@@ -40,7 +45,7 @@ export default async function run(username, provider) {
     });
 
     if (response.ok) {
-        const users = await decrypt(await response.json());
+        const users = await decrypt(await response.json(), []);
         console.log(users.length, 'users');
         for (const user of users) {
             if (user.data.oauth) {
@@ -49,18 +54,24 @@ export default async function run(username, provider) {
                     for (const p in user.data.oauth) {
                         if (p in importers) {
                             console.log('===', p, '===');
-                            await importers[p]({
-                                username: user.name,
-                                oauth: await decrypt(user.data.oauth[p]),
-                            });
+                            const oauth = await decrypt(user.data.oauth[p]);
+                            if (oauth) {
+                                await importers[p]({
+                                    username: user.name,
+                                    oauth,
+                                });
+                            }
                         }
                     }
                 } else if (user.data.oauth[provider] && importers[provider]) {
                     console.log(' ', provider);
-                    await importers[provider]({
-                        username: user.name,
-                        oauth: await decrypt(user.data.oauth[provider]),
-                    });
+                    const oauth = await decrypt(user.data.oauth[provider]);
+                    if (oauth) {
+                        await importers[provider]({
+                            username: user.name,
+                            oauth,
+                        });
+                    }
                 }
             }
         }

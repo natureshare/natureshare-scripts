@@ -5,20 +5,26 @@ import fs from 'fs';
 import fetch from 'isomorphic-unfetch';
 import yaml from 'js-yaml';
 import _sortBy from 'lodash/sortBy.js';
-import _last from 'lodash/last.js';
 import _uniq from 'lodash/uniq.js';
 import jsonschema from 'jsonschema';
 import mkdirp from 'mkdirp';
 import _mapValues from 'lodash/mapValues.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import glob from 'glob';
 import dotenv from '../utils/dotenv.js';
 import importer from './importer.js';
 import { assert } from './utils.js';
+
+const execP = promisify(exec);
 
 dotenv.config();
 
 const cwd = process.env.CONTENT_FILE_PATH;
 const apiHost = process.env.API_HOST;
+const apiToken = process.env.API_TOKEN;
 const contentHost = process.env.CONTENT_HOST;
+const awsS3Target = process.env.AWS_S3_TARGET;
 
 assert({ cwd, apiHost, contentHost });
 
@@ -64,15 +70,17 @@ const actions = {
             const targetFile = path.join(cwd, new URL(target).pathname);
             if (fs.existsSync(targetFile)) {
                 const item = yaml.safeLoad(fs.readFileSync(targetFile));
-                item.comments = (item.comments || []).filter((i) => i.ref !== id);
-                item.comments.push({
-                    ref: id,
-                    created_at: date,
-                    username: sender,
-                    text: comment,
-                });
-                // item.comments = _sortBy(item.comments, 'created_at');
-                writeYaml(targetFile, item, schemas.item);
+                if (item.allowComments !== false) {
+                    item.comments = (item.comments || []).filter((i) => i.ref !== id);
+                    item.comments.push({
+                        ref: id,
+                        created_at: date,
+                        username: sender,
+                        text: comment,
+                    });
+                    // item.comments = _sortBy(item.comments, 'created_at');
+                    writeYaml(targetFile, item, schemas.item);
+                }
             }
         }
     },
@@ -102,74 +110,102 @@ const actions = {
 const run = async () => {
     console.log(apiHost);
 
-    const lastUpdateFilePath = path.join(cwd, '.last_update');
+    let quota = 1000;
 
-    const lastUpdate = fs.existsSync(lastUpdateFilePath)
-        ? JSON.parse(fs.readFileSync(lastUpdateFilePath))
-        : '0';
+    while (true) {
+        const response = await fetch(new URL('/actions', apiHost).href);
 
-    console.log('lastUpdate: ', lastUpdate);
-
-    const response = await fetch(
-        new URL(`/actions?after=${encodeURIComponent(lastUpdate)}`, apiHost).href,
-    );
-
-    if (response.ok) {
-        console.log('HTTP OK.');
-
-        const feed = await response.json();
-
-        feed.feed_url = new URL(path.join('.', 'actions.json'), contentHost).href;
-
-        validator.validate(feed, feedSchema, { throwError: true });
-
-        if (feed.items.length === 0) {
-            throw Error('No updates.');
+        if (!response.ok) {
+            throw Error('Fetch failed!', response.status);
         } else {
-            const usernames = [];
-            const items = _sortBy(feed.items, 'date_published');
+            console.log('HTTP OK.');
 
-            for (const item of items) {
-                console.log('action:', item.title);
+            const feed = await response.json();
 
-                if (Object.keys(actions).includes(item.title)) {
-                    console.log('id:', item.id);
-                    console.log('author:', item.author.name);
-                    console.log('recipient:', item._meta.recipient);
-                    console.log('target:', item._meta.target);
-                    console.log('data:', item.content_text.trim());
+            feed.feed_url = new URL(path.join('.', 'actions.json'), contentHost).href;
 
-                    if (item._meta.recipient) usernames.push(item._meta.recipient);
+            validator.validate(feed, feedSchema, { throwError: true });
 
-                    await actions[item.title](item);
+            if (feed.items.length === 0) {
+                break;
+            } else {
+                const usernames = [];
+                const items = _sortBy(feed.items, 'date_published');
+
+                for (const item of items) {
+                    if (quota === 0) {
+                        throw Error('Quota exhausted!');
+                    }
+
+                    console.log('quota:', quota);
+                    quota -= 1;
+
+                    console.log('action:', item.title);
+
+                    if (Object.keys(actions).includes(item.title)) {
+                        console.log('id:', item.id);
+                        console.log('author:', item.author.name);
+                        console.log('recipient:', item._meta.recipient);
+                        console.log('target:', item._meta.target);
+                        console.log('data:', item.content_text.trim());
+
+                        if (item._meta.recipient) usernames.push(item._meta.recipient);
+
+                        await actions[item.title](item);
+
+                        if (glob.sync(path.join('**', '*.jpg'), { cwd }).length !== 0) {
+                            if (!awsS3Target) {
+                                throw Error('No AWS_S3_TARGET!');
+                            } else {
+                                console.log('aws sync: ', awsS3Target);
+                                const { stdout: awsOut } = await execP(
+                                    `cd "${cwd}" && aws s3 sync --size-only --no-progress --exclude "*" --include "*.jpg" "./" "${awsS3Target}"`,
+                                );
+                                console.log(awsOut);
+                            }
+                        }
+
+                        let gitChanges = false;
+
+                        try {
+                            const { stdout: gitOut } = await execP(
+                                `cd "${cwd}" && git add . && git commit -m "${item.title} by ${item.author.name}"`,
+                            );
+                            console.log(gitOut);
+                            gitChanges = true;
+                        } catch (e) {
+                            if (e.cmd) console.error(e.cmd);
+                            if (e.stdout) console.error(e.stdout);
+                            if (e.stderr) console.error(e.stderr);
+                        }
+
+                        if (gitChanges) {
+                            await execP(`cd "${cwd}" && git push`);
+                        } else {
+                            console.log('Git: No changes.');
+                        }
+                    }
+
+                    const deleteResponse = await fetch(item.url, {
+                        method: 'DELETE',
+                        headers: {
+                            Authorization: `API_TOKEN ${apiToken}`,
+                        },
+                    });
+
+                    console.log('DELETE', item.url, deleteResponse.status);
+
+                    if (deleteResponse.status !== 200) {
+                        throw Error('Failed to delete feed item.');
+                    }
 
                     console.log('---');
                 }
             }
-
-            fs.writeFileSync(
-                lastUpdateFilePath,
-                JSON.stringify(_last(items).date_published),
-                null,
-                1,
-            );
-
-            if (usernames.length !== 0) {
-                fs.writeFileSync(
-                    path.join(cwd, '.updated_usernames'),
-                    JSON.stringify(_uniq(usernames), null, 1),
-                );
-            }
         }
     }
+
+    return 'Done.';
 };
 
-run()
-    .then(() => {
-        console.log('Done.');
-        process.exit(0);
-    })
-    .catch((err) => {
-        console.error(err.message);
-        process.exit(1);
-    });
+run().then(console.log).catch(console.error);

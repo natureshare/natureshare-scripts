@@ -114,6 +114,7 @@ properties:
   tags:
     type: array
     items: *slug
+  allowComments: *bool
   comments:
     type: array
     items:
