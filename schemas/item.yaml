@@ -30,10 +30,6 @@ definitions:
     minLength: 1
     maxLength: 128
     pattern: '^[a-z0-9-_.]+$'
-  license: &license
-    type: string
-    minLength: 1
-    pattern: ^CC\sBY
   media: &media
     type: array
     items:
@@ -63,10 +59,7 @@ definitions:
             source:
               type: string
             url: *uri
-        license: *license
-
-required:
-  - license
+        license: *short_label
 
 properties:
   id:
@@ -81,7 +74,11 @@ properties:
           properties:
             name: *long_label
             common:  *long_label
-            by: *short_label
+            by:
+              oneOf:
+                - *short_label
+                - type: array
+                  items: *short_label
   datetime:
     type: string
     format: date-time
@@ -148,6 +145,6 @@ properties:
       properties:
         name: *short_label
         href: *uri
-  license: *license
+  license: *short_label
 
 

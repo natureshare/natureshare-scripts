@@ -16,6 +16,7 @@ import mkdirp from 'mkdirp';
 import moment from 'moment';
 import yaml from 'js-yaml';
 import FormData from 'form-data';
+import _uniq from 'lodash/uniq.js';
 import dotenv from '../../utils/dotenv.js';
 import { _clean, itemIsValid, getValidLocation } from './utils.js';
 
@@ -24,11 +25,12 @@ dotenv.config();
 const appHost = process.env.APP_HOST;
 const contentFilePath = process.env.CONTENT_FILE_PATH;
 
-const enableUploads = false;
+const enableUploads = true;
 const enableUpdates = false;
 
 const webHost = 'https://www.inaturalist.org';
 const apiHost = 'https://api.inaturalist.org';
+const userAgent = 'NatureShare.org';
 
 async function authFetch({ host, pathname, search, token }) {
     const url = new URL(pathname, host);
@@ -36,6 +38,7 @@ async function authFetch({ host, pathname, search, token }) {
     const response = await fetch(url.href, {
         headers: {
             Authorization: `Bearer ${token}`,
+            'User-Agent': userAgent,
         },
     });
     if (response.ok) {
@@ -51,7 +54,7 @@ async function apiFetch({ pathname, token, search }) {
 }
 
 async function userImportObservations({ username, userId, token }) {
-    let quota = 1000;
+    let quota = 10000;
     let lastId = null;
 
     do {
@@ -65,7 +68,7 @@ async function userImportObservations({ username, userId, token }) {
                 ...(lastId ? { id_below: lastId } : {}),
                 order_by: 'id',
                 order: 'desc',
-                per_page: 10,
+                per_page: 200,
             },
             token,
         });
@@ -80,34 +83,43 @@ async function userImportObservations({ username, userId, token }) {
                 uri,
                 time_observed_at,
                 private_location,
+                location,
                 place_guess,
                 description,
                 ofvs,
                 tags,
                 identifications,
+                taxon,
                 photos,
                 license_code,
                 created_at,
                 updated_at,
             } of data.results) {
-                console.log('    Observation:', id);
                 lastId = id;
 
                 if (ofvs && ofvs.filter((f) => f.name === 'NatureShare URL').length !== 0) {
-                    console.log('     -> skip');
+                    // console.log('     -> skip');
                 } else {
+                    console.log(' -> Observation', id);
+
                     const item = _clean({
-                        id:
-                            identifications &&
-                            identifications.map((i) => ({
-                                name: i.taxon.name,
-                                common: i.taxon.preferred_common_name,
-                                by: i.user.login,
-                            })),
+                        id: taxon && [
+                            _clean({
+                                name: taxon.name,
+                                common: taxon.preferred_common_name,
+                                by:
+                                    identifications &&
+                                    _uniq(
+                                        identifications
+                                            .filter((i) => i.taxon.name === taxon.name)
+                                            .map((i) => i.user.login),
+                                    ),
+                            }),
+                        ],
                         datetime: time_observed_at,
                         ...getValidLocation({
-                            latitude: private_location.split(',', 2)[0],
-                            longitude: private_location.split(',', 2)[1],
+                            latitude: (private_location || location || '').split(',', 2)[0],
+                            longitude: (private_location || location || '').split(',', 2)[1],
                         }),
                         location_name: place_guess,
                         description,
@@ -124,9 +136,9 @@ async function userImportObservations({ username, userId, token }) {
                             height: i.original_dimensions.height,
                             thumbnail_url: `https://static.inaturalist.org/photos/${i.id}/large.jpg`,
                             original_url: `https://static.inaturalist.org/photos/${i.id}/original.jpg`,
-                            license: i.license_code.toUpperCase().replace('-', ' '),
+                            license: i.license_code,
                         })),
-                        license: license_code.toUpperCase().replace('-', ' '),
+                        license: license_code,
                         created_at,
                         updated_at,
                         source: [
@@ -194,6 +206,7 @@ async function userUploadPhoto({ observationId, photoUrl, token }) {
                     method: 'POST',
                     headers: {
                         Authorization: `Bearer ${token}`,
+                        'User-Agent': userAgent,
                         ...form.getHeaders(),
                     },
                     body: form,
@@ -263,6 +276,7 @@ async function userUploadObservationItem({ itemsDir, filePath, username, userId,
         const response = await fetch(new URL('/v1/observations', apiHost).href, {
             headers: {
                 Authorization: `Bearer ${token}`,
+                'User-Agent': userAgent,
                 'Content-Type': 'application/json',
             },
             method: 'post',
@@ -306,6 +320,7 @@ async function userUpdateObservationItem({ observationId, itemsDir, filePath, us
     const response = await fetch(new URL(`/v1/observations/${observationId}`, apiHost).href, {
         headers: {
             Authorization: `Bearer ${token}`,
+            'User-Agent': userAgent,
             'Content-Type': 'application/json',
         },
         method: 'put',
@@ -330,7 +345,7 @@ async function userUploadObservations({ username, userId, token }) {
         const index = fs.existsSync(indexFilePath)
             ? yaml.safeLoad(fs.readFileSync(indexFilePath))
             : {};
-        let quota = 500;
+        let quota = 100;
         for (const dir of glob
             .sync('*', { cwd: itemsDir })
             .filter((f) => f && f !== 'inaturalist' && isDirectory(itemsDir, f))) {
