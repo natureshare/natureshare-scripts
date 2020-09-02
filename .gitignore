@@ -2,4 +2,3 @@
 .env
 node_modules
 actions/importerRunTest.js
-actions/importerRunReilly.js

@@ -60,6 +60,7 @@ definitions:
               type: string
             url: *uri
         license: *short_label
+        attribution: *long_label
 
 properties:
   id:

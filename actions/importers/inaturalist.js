@@ -32,12 +32,19 @@ const webHost = 'https://www.inaturalist.org';
 const apiHost = 'https://api.inaturalist.org';
 const userAgent = 'NatureShare.org';
 
+async function sleep(seconds) {
+    console.log('Sleep...');
+    return new Promise((resolve) => {
+        setTimeout(() => resolve(), seconds * 1000);
+    });
+}
+
 async function authFetch({ host, pathname, search, token }) {
     const url = new URL(pathname, host);
     if (search) url.search = new URLSearchParams(search);
     const response = await fetch(url.href, {
         headers: {
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             'User-Agent': userAgent,
         },
     });
@@ -53,9 +60,16 @@ async function apiFetch({ pathname, token, search }) {
     return authFetch({ host: apiHost, pathname, search, token });
 }
 
-async function userImportObservations({ username, userId, token }) {
+export async function userImportObservations({ username, userId, userLogin, token }) {
+    if (!userId && !userLogin) throw new Error('userId or userLogin is required!');
+
     let quota = 10000;
     let lastId = null;
+
+    const itemsDir = path.join(process.env.CONTENT_FILE_PATH, username, 'items');
+    const indexFilePath = path.join(itemsDir, 'inaturalist.yaml');
+
+    const index = fs.existsSync(indexFilePath) ? yaml.safeLoad(fs.readFileSync(indexFilePath)) : {};
 
     do {
         console.log('lastId', lastId, 'quota', quota);
@@ -63,7 +77,8 @@ async function userImportObservations({ username, userId, token }) {
         const data = await apiFetch({
             pathname: '/v1/observations',
             search: {
-                user_id: userId,
+                ...(userId ? { user_id: userId } : {}),
+                ...(userLogin ? { user_login: userLogin } : {}),
                 // updated_since: todo
                 ...(lastId ? { id_below: lastId } : {}),
                 order_by: 'id',
@@ -74,10 +89,9 @@ async function userImportObservations({ username, userId, token }) {
         });
 
         if (data.results.length === 0) {
+            console.log(' -> No data');
             quota = 0;
         } else {
-            quota -= data.results.length;
-
             for (const {
                 id,
                 uri,
@@ -96,12 +110,41 @@ async function userImportObservations({ username, userId, token }) {
                 updated_at,
             } of data.results) {
                 lastId = id;
+                quota -= 1;
 
-                if (ofvs && ofvs.filter((f) => f.name === 'NatureShare URL').length !== 0) {
-                    // console.log('     -> skip');
+                console.log(' -> Observation', id);
+
+                const natureShareUrls =
+                    (ofvs &&
+                        ofvs.filter((i) => i.name === 'NatureShare URL').map((i) => i.value)) ||
+                    [];
+
+                if (natureShareUrls.length !== 0) {
+                    const url = new URL(natureShareUrls[0]);
+
+                    let filePath = null;
+
+                    if (/\/observations\/[a-f0-9]+/.test(url.pathname)) {
+                        const fileId = url.pathname.split('/')[2];
+                        const fileSearch = glob.sync(path.join('ns', '*', `${fileId}.yaml`), {
+                            cwd: itemsDir,
+                        });
+                        if (fileSearch.length !== 0) {
+                            [filePath] = fileSearch;
+                        }
+                    } else if (url.search) {
+                        filePath = new URLSearchParams(url.search)
+                            .get('i')
+                            .replace(new RegExp(`^${process.env.CONTENT_HOST}`), '')
+                            .replace(new RegExp(`^[./]*${username}/items/`), '');
+                    }
+
+                    console.log('  -->', filePath);
+
+                    if (filePath) {
+                        index[filePath] = id;
+                    }
                 } else {
-                    console.log(' -> Observation', id);
-
                     const item = _clean({
                         id: taxon && [
                             _clean({
@@ -129,15 +172,18 @@ async function userImportObservations({ username, userId, token }) {
                                 ? tags.map((i) => i.toLowerCase().replace(/[^a-z0-9-_.]/g, ''))
                                 : []),
                         ],
-                        photos: photos.map((i) => ({
-                            source: 'iNaturalist',
-                            id: `${i.id}`,
-                            width: i.original_dimensions.width,
-                            height: i.original_dimensions.height,
-                            thumbnail_url: `https://static.inaturalist.org/photos/${i.id}/large.jpg`,
-                            original_url: `https://static.inaturalist.org/photos/${i.id}/original.jpg`,
-                            license: i.license_code,
-                        })),
+                        photos: photos.map((i) =>
+                            _clean({
+                                source: 'iNaturalist',
+                                id: `${i.id}`,
+                                width: i.original_dimensions && i.original_dimensions.width,
+                                height: i.original_dimensions && i.original_dimensions.height,
+                                thumbnail_url: i.url && i.url.replace('/square', '/medium'),
+                                original_url: i.url && i.url.replace('/square', '/original'),
+                                license: i.license_code,
+                                attribution: i.attribution,
+                            }),
+                        ),
                         license: license_code,
                         created_at,
                         updated_at,
@@ -165,14 +211,21 @@ async function userImportObservations({ username, userId, token }) {
 
                         mkdirp.sync(dirPath);
                         fs.writeFileSync(path.join(dirPath, `${id}.yaml`), doc);
+                        console.log('  -->', path.join(dirPath, `${id}.yaml`));
                     } else {
                         console.log(item);
-                        console.log(' -> invalid');
+                        console.log('  --> invalid');
                     }
                 }
             }
         }
+
+        fs.writeFileSync(indexFilePath, yaml.safeDump(index));
+
+        if (quota > 0) await sleep(5);
     } while (quota > 0);
+
+    return quota;
 }
 
 async function userUploadPhoto({ observationId, photoUrl, token }) {
