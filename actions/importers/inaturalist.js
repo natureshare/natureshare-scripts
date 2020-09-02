@@ -398,7 +398,7 @@ async function userUploadObservations({ username, userId, token }) {
         const index = fs.existsSync(indexFilePath)
             ? yaml.safeLoad(fs.readFileSync(indexFilePath))
             : {};
-        let quota = 100;
+        let quota = 1000;
         for (const dir of glob
             .sync('*', { cwd: itemsDir })
             .filter((f) => f && f !== 'inaturalist' && isDirectory(itemsDir, f))) {
