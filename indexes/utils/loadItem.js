@@ -6,6 +6,7 @@ import yaml from 'js-yaml';
 import _uniq from 'lodash/uniq.js';
 import _isArray from 'lodash/isArray.js';
 import _truncate from 'lodash/truncate.js';
+import moment from 'moment';
 import dotenv from '../../utils/dotenv.js';
 import omitNull from './omitNull.js';
 import { coord } from './utils.js';
@@ -67,8 +68,8 @@ export default (userDir, f) => {
         title,
         content_text: description || '-',
         image,
-        date_published: createdAt,
-        date_modified: updatedAt,
+        date_published: createdAt && moment(createdAt).toISOString(true),
+        date_modified: (updatedAt || createdAt) && moment(updatedAt || createdAt).toISOString(true),
         tags: [
             ...(_isArray(idNames) ? idNames.map((i) => `id~${i}`) : ['id~Unidentified']),
             ...(_isArray(tags) && tags.length !== 0
@@ -81,7 +82,7 @@ export default (userDir, f) => {
             coordinates: coord([longitude, latitude]),
         },
         _meta: omitNull({
-            date: (datetime && datetime.split('T')[0]) || null,
+            date: (datetime && moment(datetime).format('YYYY-MM-DD')) || null,
             imageCount: (photos && photos.length) || null,
             videoCount: (videos && videos.length) || null,
             audioCount: (audio && audio.length) || null,
