@@ -30,6 +30,12 @@ definitions:
     minLength: 1
     maxLength: 128
     pattern: '^[a-z0-9-_.]+$'
+  date: &date
+    oneOf:
+      - type: string
+        format: date
+      - type: string
+        format: date-time
   media: &media
     type: array
     items:
@@ -43,9 +49,7 @@ definitions:
         href: *uri
         primary:
           type: boolean
-        datetime:
-          type: string
-          format: date-time
+        datetime: *date
         height:
           type: number
         width:
@@ -80,9 +84,7 @@ properties:
                 - *short_label
                 - type: array
                   items: *short_label
-  datetime:
-    type: string
-    format: date-time
+  datetime: *date
   latitude: *latitude
   longitude: *longitude
   elevation:
@@ -103,12 +105,8 @@ properties:
   photo_datetime_used: *bool
   photo_geotag_used: *bool
   photo_quality: *short_label
-  created_at:
-    type: string
-    format: date-time
-  updated_at:
-    type: string
-    format: date-time
+  created_at: *date
+  updated_at: *date
   tags:
     type: array
     items: *slug
@@ -123,9 +121,7 @@ properties:
         # - text
         # - username
       properties:
-        created_at:
-          type: string
-          format: date-time
+        created_at: *date
         text:
           type: string
         ref:
