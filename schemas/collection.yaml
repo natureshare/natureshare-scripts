@@ -1,6 +1,6 @@
 type: object
 additionalProperties: false
-  
+
 definitions:
   short_label: &short_label
     type: string
@@ -23,6 +23,11 @@ definitions:
     description: Longitude
     minimum: -180
     maximum: 180
+  slug: &slug
+    type: string
+    minLength: 1
+    maxLength: 128
+    pattern: '^[a-z0-9-_.~]+$'
 
 properties:
   featured:
@@ -42,9 +47,34 @@ properties:
   members:
     type: array
     items: *short_label
-  species:
+  identifications:
     type: array
-    items: *long_label
+    items:
+      oneOf:
+        - *long_label
+        - type: object
+          additionalProperties: false
+          required:
+            - name
+          properties:
+            name: *long_label
+            common: *long_label
+            tags:
+              type: array
+              items: *slug
+  tags:
+    type: array
+    items: *slug
   extra_items:
     type: array
-    items: *long_label
+    items:
+      oneOf:
+        - *long_label
+        - type: object
+          additionalProperties: false
+          required:
+            - path
+          properties:
+            path: *long_label
+            feature:
+              type: boolean

@@ -13,7 +13,6 @@
     "dependencies": {
         "dotenv": "^8.2.0",
         "dropbox": "^5.2.1",
-        "feed": "^4.2.1",
         "feedparser": "^2.2.10",
         "flickr-sdk": "^3.9.0",
         "form-data": "^3.0.0",
