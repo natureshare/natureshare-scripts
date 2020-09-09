@@ -9,6 +9,7 @@ import _uniq from 'lodash/uniq.js';
 import _uniqBy from 'lodash/uniqBy.js';
 import _pickBy from 'lodash/pickBy.js';
 import _mapValues from 'lodash/mapValues.js';
+import _isArray from 'lodash/isArray.js';
 import _startsWith from 'lodash/startsWith.js';
 import dotenv from '../utils/dotenv.js';
 import omitNull from './utils/omitNull.js';
@@ -53,6 +54,8 @@ const build = (userDir) => {
                 latitude: meta.latitude,
                 longitude: meta.longitude,
                 featured: meta.featured,
+                identifications: meta.identifications,
+                tags: meta.tags,
                 extraItems: _uniq(meta.extra_items || []),
                 members: _uniq([userDir, ...(meta.admins || []), ...(meta.members || [])]),
                 items: [],
@@ -132,9 +135,75 @@ const build = (userDir) => {
             } while (page <= pageCount);
         });
 
-        if (collectionsIndex[c].items.length !== 0) {
-            collectionsIndex[c].items = sortFeedItems(_uniqBy(collectionsIndex[c].items, 'id'));
+        collectionsIndex[c].items = _uniqBy(collectionsIndex[c].items, 'id');
 
+        if (_isArray(collectionsIndex[c].identifications)) {
+            const idTags = collectionsIndex[c].identifications.map(
+                (i) => `id~${typeof i === 'string' ? i : i.name}`,
+            );
+
+            // Only keep items allowed in the collection:
+
+            collectionsIndex[c].items = collectionsIndex[c].items.filter(
+                (i) =>
+                    _isArray(i.tags) && i.tags.reduce((acc, t) => acc || idTags.includes(t), false),
+            );
+
+            // Remove all extra ids from the items:
+
+            collectionsIndex[c].items = collectionsIndex[c].items.map((i) => ({
+                ...i,
+                tags: i.tags.filter((t) => !_startsWith(t, 'id~') || idTags.includes(t)),
+            }));
+
+            const idTagsMap = collectionsIndex[c].identifications.reduce((acc, i) => {
+                if (typeof i === 'object' && i.name && _isArray(i.tags)) {
+                    acc[`id~${i.name}`] = i.tags.map((t) => `tag~${t}`);
+                }
+                return acc;
+            }, {});
+
+            if (Object.keys(idTagsMap).length !== 0) {
+                // Add additional collection tags to items for each id:
+
+                collectionsIndex[c].items = collectionsIndex[c].items.map((i) => ({
+                    ...i,
+                    tags: _uniq(
+                        i.tags.concat(
+                            i.tags.reduce((acc, t) => {
+                                if (idTagsMap[t]) {
+                                    return acc.concat(idTagsMap[t]);
+                                }
+                                return acc;
+                            }, []),
+                        ),
+                    ),
+                }));
+            }
+        }
+
+        if (_isArray(collectionsIndex[c].tags)) {
+            const tagsFilter = collectionsIndex[c].tags.map((t) => `tag~${t}`);
+
+            if (_isArray(collectionsIndex[c].identifications)) {
+                collectionsIndex[c].identifications.forEach((i) => {
+                    if (typeof i === 'object' && _isArray(i.tags)) {
+                        i.tags.forEach((t) => tagsFilter.push(`tag~${t}`));
+                    }
+                });
+            }
+
+            // Remove tags not listed on the collection:
+
+            collectionsIndex[c].items = collectionsIndex[c].items.map((i) => ({
+                ...i,
+                tags: i.tags.filter((t) => !_startsWith(t, 'tag~') || tagsFilter.includes(t)),
+            }));
+        }
+
+        collectionsIndex[c].items = sortFeedItems(_uniqBy(collectionsIndex[c].items, 'id'));
+
+        if (collectionsIndex[c].items.length !== 0) {
             // Aggregate index:
 
             writeFiles({
