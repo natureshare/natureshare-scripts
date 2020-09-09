@@ -25,13 +25,17 @@ glob.sync(path.join('*'), { cwd })
     )
     .slice(0, 100000)
     .forEach((username) => {
-        const filePath = path.join(username, 'profile.yaml');
+        // const filePath = path.join();
+        const profileFilePath = path.join(cwd, username, 'profile.yaml');
+        const indexFilePath = path.join(cwd, username, 'items', 'index.json');
 
-        if (!fs.existsSync(path.join(cwd, filePath))) {
+        if (!fs.existsSync(profileFilePath) && !fs.existsSync(indexFilePath)) {
             console.log(username);
-            console.log(' --> Profile not found!');
+            console.log(' --> No files found!');
         } else {
-            const profile = yaml.safeLoad(fs.readFileSync(path.join(cwd, filePath)));
+            const profile = fs.existsSync(profileFilePath)
+                ? yaml.safeLoad(fs.readFileSync(profileFilePath))
+                : {};
 
             const id = new URL(path.join('.', username, 'items', 'index.json'), contentHost).href;
 
@@ -44,10 +48,10 @@ glob.sync(path.join('*'), { cwd })
             let itemCount = 0;
             let coordinates = null;
 
-            const indexFile = path.join(cwd, username, 'items', 'index.json');
-
-            if (fs.existsSync(indexFile)) {
-                const { items: recentItems, _meta: meta } = JSON.parse(fs.readFileSync(indexFile));
+            if (fs.existsSync(indexFilePath)) {
+                const { items: recentItems, _meta: meta } = JSON.parse(
+                    fs.readFileSync(indexFilePath),
+                );
                 datePublished = recentItems[0].date_published;
                 dateModified = recentItems[0].date_modified;
                 image = (recentItems.filter((i) => i.image)[0] || {}).image;
