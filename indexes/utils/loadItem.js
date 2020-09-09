@@ -26,6 +26,15 @@ const mapIdNames = (ary) =>
             .filter((i) => i.length !== 0),
     );
 
+const idCommonNames = (ary) =>
+    _uniq(
+        (_isArray(ary) ? ary : [])
+            .map((i) => (typeof i === 'object' ? i.common : null))
+            .filter((i) => typeof i === 'string')
+            .map((i) => i.trim())
+            .filter((i) => i.length !== 0),
+    );
+
 export default (userDir, f) => {
     const filePath = path.join(userDir, 'items', f);
 
@@ -82,6 +91,7 @@ export default (userDir, f) => {
             coordinates: coord([longitude, latitude]),
         },
         _meta: omitNull({
+            subtitle: idCommonNames(identifications)[0],
             date: (datetime && moment(datetime).format('YYYY-MM-DD')) || null,
             imageCount: (photos && photos.length) || null,
             videoCount: (videos && videos.length) || null,
