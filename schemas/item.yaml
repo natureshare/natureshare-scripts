@@ -28,7 +28,7 @@ definitions:
   slug: &slug
     type: string
     minLength: 1
-    maxLength: 128
+    maxLength: 1000
     pattern: '^[a-z0-9-_.~]+$'
   date: &date
     oneOf:
@@ -36,6 +36,11 @@ definitions:
         format: date
       - type: string
         format: date-time
+      - type: date
+  license: &license
+    type: string
+    minLength: 1
+    pattern: ^CC\sBY
   media: &media
     type: array
     items:
@@ -63,7 +68,7 @@ definitions:
             source:
               type: string
             url: *uri
-        license: *short_label
+        license: *license
         attribution: *long_label
 
 properties:
@@ -84,6 +89,8 @@ properties:
                 - *short_label
                 - type: array
                   items: *short_label
+            ref:
+              type: object
   datetime: *date
   latitude: *latitude
   longitude: *longitude
@@ -142,6 +149,6 @@ properties:
       properties:
         name: *short_label
         href: *uri
-  license: *short_label
+  license: *license
 
 

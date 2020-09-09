@@ -34,7 +34,7 @@ const webHost = 'https://www.inaturalist.org';
 const apiHost = 'https://api.inaturalist.org';
 const userAgent = 'NatureShare.org';
 
-async function sleep(seconds) {
+export async function sleep(seconds) {
     return new Promise((resolve) => {
         setTimeout(() => resolve(), seconds * 1000);
     });
@@ -73,6 +73,87 @@ async function apiFetch({ pathname, token, search }) {
     return authFetch({ host: apiHost, pathname, search, token });
 }
 
+const licenseMap = {
+    null: 'Copyright',
+    'cc-by-nc': 'CC BY-NC',
+};
+
+const license = (str) =>
+    licenseMap[str] || (str && str.toUpperCase().replace(/^CC-/, 'CC ')) || str;
+
+export const makeTag = (str) =>
+    str
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9-_.~]/g, '')
+        .replace(/_+/, '_');
+
+export function observationToItem({
+    uri,
+    time_observed_at,
+    location,
+    public_positional_accuracy,
+    place_guess,
+    description,
+    tags,
+    identifications,
+    taxon,
+    photos,
+    license_code,
+    created_at,
+    updated_at,
+}) {
+    return _clean({
+        id: taxon && [
+            _clean({
+                name: taxon.name,
+                common: taxon.preferred_common_name,
+                by:
+                    identifications &&
+                    _uniq(
+                        identifications
+                            .filter((i) => i.taxon.name === taxon.name)
+                            .map((i) => i.user.login),
+                    ),
+                ref: { inaturalist: taxon.id },
+            }),
+        ],
+        datetime: time_observed_at,
+        ...getValidLocation({
+            latitude: (location || '').split(',', 2)[0],
+            longitude: (location || '').split(',', 2)[1],
+        }),
+        location_name: place_guess,
+        accuracy: public_positional_accuracy,
+        description,
+        tags: ['inaturalist', ...(tags ? tags.map((i) => makeTag(i)) : [])],
+        photos: (photos || [])
+            .filter((i) => i.license_code)
+            .map((i) =>
+                _clean({
+                    source: 'iNaturalist',
+                    id: `${i.id}`,
+                    width: i.original_dimensions && i.original_dimensions.width,
+                    height: i.original_dimensions && i.original_dimensions.height,
+                    thumbnail_url: i.url && i.url.replace('/square', '/medium'),
+                    original_url: i.url && i.url.replace('/square', '/original'),
+                    license: license(i.license_code),
+                    attribution: i.attribution.replace(/^\(c\)\s/, '').split(',', 1)[0],
+                    href: `https://www.inaturalist.org/photos/${i.id}`,
+                }),
+            ),
+        license: license(license_code),
+        created_at,
+        updated_at,
+        source: [
+            {
+                name: 'iNaturalist',
+                href: uri, // `https://www.inaturalist.org/observations/${id}`,
+            },
+        ],
+    });
+}
+
 export async function userImportObservations({ username, userId, userLogin, token }) {
     if (!userId && !userLogin) throw new Error('userId or userLogin is required!');
 
@@ -106,22 +187,9 @@ export async function userImportObservations({ username, userId, userLogin, toke
                 console.log(' -> No data');
                 quota = 0;
             } else {
-                for (const {
-                    id,
-                    uri,
-                    time_observed_at,
-                    location,
-                    place_guess,
-                    description,
-                    ofvs,
-                    tags,
-                    identifications,
-                    taxon,
-                    photos,
-                    license_code,
-                    created_at,
-                    updated_at,
-                } of data.results) {
+                for (const observation of data.results) {
+                    const { id, ofvs, created_at, updated_at } = observation;
+
                     lastId = id;
                     quota -= 1;
 
@@ -158,55 +226,7 @@ export async function userImportObservations({ username, userId, userLogin, toke
                             index[filePath] = [id, updated_at];
                         }
                     } else {
-                        const item = _clean({
-                            id: taxon && [
-                                _clean({
-                                    name: taxon.name,
-                                    common: taxon.preferred_common_name,
-                                    by:
-                                        identifications &&
-                                        _uniq(
-                                            identifications
-                                                .filter((i) => i.taxon.name === taxon.name)
-                                                .map((i) => i.user.login),
-                                        ),
-                                }),
-                            ],
-                            datetime: time_observed_at,
-                            ...getValidLocation({
-                                latitude: (location || '').split(',', 2)[0],
-                                longitude: (location || '').split(',', 2)[1],
-                            }),
-                            location_name: place_guess,
-                            description,
-                            tags: [
-                                'inaturalist',
-                                ...(tags
-                                    ? tags.map((i) => i.toLowerCase().replace(/[^a-z0-9-_.]/g, ''))
-                                    : []),
-                            ],
-                            photos: photos.map((i) =>
-                                _clean({
-                                    source: 'iNaturalist',
-                                    id: `${i.id}`,
-                                    width: i.original_dimensions && i.original_dimensions.width,
-                                    height: i.original_dimensions && i.original_dimensions.height,
-                                    thumbnail_url: i.url && i.url.replace('/square', '/medium'),
-                                    original_url: i.url && i.url.replace('/square', '/original'),
-                                    license: i.license_code,
-                                    attribution: i.attribution,
-                                }),
-                            ),
-                            license: license_code,
-                            created_at,
-                            updated_at,
-                            source: [
-                                {
-                                    name: 'iNaturalist',
-                                    href: uri, // `https://www.inaturalist.org/observations/${id}`,
-                                },
-                            ],
-                        });
+                        const item = observationToItem(observation);
 
                         if (itemIsValid(item)) {
                             const doc = yaml.safeDump(item, {
@@ -324,6 +344,7 @@ function loadItem({ username, itemsDir, filePath }) {
                     value: url.href,
                 },
             ],
+            // id_please: false,
         }),
     };
     // console.log(body);
