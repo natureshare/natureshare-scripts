@@ -14,19 +14,23 @@ import { sleep, observationToItem, makeTag } from '../actions/importers/inatural
 
 const { argv } = yargs;
 
+const iNatHost = 'api.inaturalist.org';
+
 function randomInt(max) {
     return Math.floor(Math.random() * Math.floor(max));
 }
 
 async function apiFetch(urlPath) {
-    const cacheFilePath = `${path.join('_cache', 'api.inaturalist.org', 'v1', urlPath)}.json`;
+    const cacheFilePath = `${path.join('_cache', iNatHost, 'v1', urlPath)}.json`;
     if (fs.existsSync(cacheFilePath)) {
         return JSON.parse(fs.readFileSync(cacheFilePath));
     }
     const sec = randomInt(6 / 2);
     console.log('Sleep', sec, 'seconds...');
     await sleep(sec);
-    const url = new URL(urlPath, 'https://api.inaturalist.org/v1/');
+    const url = new URL(`/v1/${urlPath}`);
+    url.host = iNatHost;
+    url.protocol = 'https';
     const response = await fetch(url.href, {
         headers: {
             'User-Agent': 'natureshare.org',

@@ -85,3 +85,8 @@ properties:
     type: array
     items:
       type: number
+  wikipedia:
+    description: A list of Wikipedia pages.
+    type: array
+    items:
+      type: string
