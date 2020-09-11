@@ -42,7 +42,7 @@ export const validateItem = (obj, throwError) => {
         throwError,
     });
     if (result.errors.length !== 0) {
-        console.error(result.errors);
+        result.errors.forEach((e) => console.log(e.stack));
     }
     return result;
 };

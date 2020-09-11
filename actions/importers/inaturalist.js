@@ -72,14 +72,15 @@ async function authFetch({ host, pathname, search, token }) {
 async function apiFetch({ pathname, token, search }) {
     return authFetch({ host: apiHost, pathname, search, token });
 }
-
 const licenseMap = {
-    null: 'Copyright',
-    'cc-by-nc': 'CC BY-NC',
+    null: 'reserved',
+    cc0: 'CC0',
 };
 
 const license = (str) =>
-    licenseMap[str] || (str && str.toUpperCase().replace(/^CC-/, 'CC ')) || str;
+    licenseMap[str] ||
+    (str && typeof str === 'string' && str.toUpperCase().replace(/^CC-/, 'CC ')) ||
+    null;
 
 export const makeTag = (str) =>
     str
@@ -127,21 +128,19 @@ export function observationToItem({
         accuracy: public_positional_accuracy,
         description,
         tags: ['inaturalist', ...(tags ? tags.map((i) => makeTag(i)) : [])],
-        photos: (photos || [])
-            .filter((i) => i.license_code)
-            .map((i) =>
-                _clean({
-                    source: 'iNaturalist',
-                    id: `${i.id}`,
-                    width: i.original_dimensions && i.original_dimensions.width,
-                    height: i.original_dimensions && i.original_dimensions.height,
-                    thumbnail_url: i.url && i.url.replace('/square', '/medium'),
-                    original_url: i.url && i.url.replace('/square', '/original'),
-                    license: license(i.license_code),
-                    attribution: i.attribution.replace(/^\(c\)\s/, '').split(',', 1)[0],
-                    href: `https://www.inaturalist.org/photos/${i.id}`,
-                }),
-            ),
+        photos: (photos || []).map((i) =>
+            _clean({
+                source: 'iNaturalist',
+                id: `${i.id}`,
+                width: i.original_dimensions && i.original_dimensions.width,
+                height: i.original_dimensions && i.original_dimensions.height,
+                thumbnail_url: i.url && i.url.replace('/square', '/medium'),
+                original_url: i.url && i.url.replace('/square', '/original'),
+                license: license(i.license_code),
+                attribution: i.attribution.replace(/^\(c\)\s/, '').split(',', 1)[0],
+                href: `https://www.inaturalist.org/photos/${i.id}`,
+            }),
+        ),
         license: license(license_code),
         created_at,
         updated_at,

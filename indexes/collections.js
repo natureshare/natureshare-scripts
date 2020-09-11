@@ -49,6 +49,7 @@ const build = (userDir) => {
             const meta = yaml.safeLoad(fs.readFileSync(path.join(collectionsDir, f)));
 
             collectionsIndex[name] = {
+                hide: meta.hide,
                 title: meta.title || _startCase(name),
                 description: (meta.description || '').slice(0, 1000),
                 latitude: meta.latitude,
@@ -219,7 +220,13 @@ const build = (userDir) => {
     // Index of all collections (this must be AFTER aggregation for accurate counts):
 
     writeFilesIndex({
-        index: _pickBy(_mapValues(collectionsIndex, 'items'), (i) => i.length !== 0),
+        index: _pickBy(
+            _mapValues(
+                _pickBy(collectionsIndex, (i) => !i.hide),
+                'items',
+            ),
+            (i) => i.length !== 0,
+        ),
         userDir,
         subDir: 'collections',
         _title: 'Collections',

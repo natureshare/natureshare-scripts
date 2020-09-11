@@ -40,7 +40,7 @@ definitions:
   license: &license
     type: string
     minLength: 1
-    pattern: ^CC\sBY
+    pattern: ^CC.+
   media: &media
     type: array
     items:
@@ -70,6 +70,9 @@ definitions:
             url: *uri
         license: *license
         attribution: *long_label
+
+required:
+  - license
 
 properties:
   id:
