@@ -80,8 +80,18 @@ properties:
             path: *long_label
             feature:
               type: boolean
-  inaturalist:
-    description: A list of iNaturalist.org observations ids to import.
-    type: array
-    items:
-      type: number
+  display:
+    type: object
+    additionalProperties: false
+    properties:
+      sort_by:
+        type: string
+      sort_order:
+        type: string
+        pattern: ^(asc|desc)$
+      start_tags:
+        type: array
+        items:
+          type: string
+  source_data:
+    type: object

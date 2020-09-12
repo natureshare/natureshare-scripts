@@ -23,6 +23,7 @@
         "jsonfeed-to-rss": "^3.0.3",
         "jsonschema": "^1.2.6",
         "lodash": "^4.17.19",
+        "markdown-it": "^11.0.0",
         "mkdirp": "^1.0.4",
         "moment": "^2.27.0",
         "node-fetch": "^2.6.0",

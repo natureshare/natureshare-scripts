@@ -63,6 +63,7 @@ export const writeFiles = ({
     _homePageUrl,
     _authorName,
     _userUrl,
+    _display = {},
 }) => {
     const fileDir = path.join(userDir, subDir);
     const feedUrl = new URL(path.join('.', fileDir, 'index.json'), contentHost).href;
@@ -102,6 +103,7 @@ export const writeFiles = ({
                 pageNumber: page,
                 pageCount,
             },
+            _display,
         };
 
         if (page === 1) {

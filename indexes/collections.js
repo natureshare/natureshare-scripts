@@ -10,7 +10,11 @@ import _uniqBy from 'lodash/uniqBy.js';
 import _pickBy from 'lodash/pickBy.js';
 import _mapValues from 'lodash/mapValues.js';
 import _isArray from 'lodash/isArray.js';
+import _pick from 'lodash/pick.js';
 import _startsWith from 'lodash/startsWith.js';
+import _stripTags from 'underscore.string/stripTags.js';
+import _upperFirst from 'lodash/upperFirst.js';
+import MarkdownIt from 'markdown-it';
 import dotenv from '../utils/dotenv.js';
 import omitNull from './utils/omitNull.js';
 import { writeFiles, writeFilesIndex } from './utils/writeFiles.js';
@@ -24,6 +28,8 @@ const appHost = process.env.APP_HOST;
 const contentHost = process.env.CONTENT_HOST;
 
 const debug = false;
+
+const markdown = new MarkdownIt({ html: false, breaks: false, linkify: true });
 
 function consoleLog(...str) {
     if (debug) console.log(...str);
@@ -49,16 +55,8 @@ const build = (userDir) => {
             const meta = yaml.safeLoad(fs.readFileSync(path.join(collectionsDir, f)));
 
             collectionsIndex[name] = {
-                hide: meta.hide,
-                title: meta.title || _startCase(name),
-                description: (meta.description || '').slice(0, 1000),
-                latitude: meta.latitude,
-                longitude: meta.longitude,
-                featured: meta.featured,
-                identifications: meta.identifications,
-                tags: meta.tags,
-                extraItems: _uniq(meta.extra_items || []),
-                members: _uniq([userDir, ...(meta.admins || []), ...(meta.members || [])]),
+                title: _upperFirst(name.replace(/_/g, ' ')),
+                ...meta,
                 items: [],
             };
         });
@@ -78,9 +76,7 @@ const build = (userDir) => {
                 consoleLog('    ', name);
 
                 collectionsIndex[name] = {
-                    title: _startCase(name),
-                    extraItems: [],
-                    members: [userDir],
+                    title: _upperFirst(name.replace(/_/g, ' ')),
                     items: [],
                 };
             }
@@ -92,11 +88,13 @@ const build = (userDir) => {
     consoleLog('  ', 'LOAD');
 
     Object.keys(collectionsIndex).forEach((c) => {
+        const meta = collectionsIndex[c];
+
         consoleLog('    ', c);
 
         // Load in extra items manually added to the YAML file:
 
-        collectionsIndex[c].extraItems.forEach((e) => {
+        _uniq(meta.extra_items || []).forEach((e) => {
             const [u, , ...f] = e.split(path.sep);
 
             consoleLog('      ', 'Extra:', e);
@@ -108,12 +106,12 @@ const build = (userDir) => {
                 url: userUrl(u),
             };
 
-            collectionsIndex[c].items.push(item);
+            meta.items.push(item);
         });
 
         // Load in item indexes for each member:
 
-        collectionsIndex[c].members.forEach((m) => {
+        _uniq([userDir, ...(meta.admins || []), ...(meta.members || [])]).forEach((m) => {
             let page = 1;
             let pageCount = 1;
             do {
@@ -127,7 +125,7 @@ const build = (userDir) => {
                 if (fs.existsSync(f)) {
                     consoleLog('      ', 'Import:', f);
                     const feed = JSON.parse(fs.readFileSync(f));
-                    collectionsIndex[c].items = collectionsIndex[c].items.concat(feed.items);
+                    meta.items = meta.items.concat(feed.items);
                     pageCount = feed.pageCount;
                     page += 1;
                 } else {
@@ -136,28 +134,28 @@ const build = (userDir) => {
             } while (page <= pageCount);
         });
 
-        collectionsIndex[c].items = _uniqBy(collectionsIndex[c].items, 'id');
+        meta.items = _uniqBy(meta.items, 'id');
 
-        if (_isArray(collectionsIndex[c].identifications)) {
-            const idTags = collectionsIndex[c].identifications.map(
+        if (_isArray(meta.identifications)) {
+            const idTags = meta.identifications.map(
                 (i) => `id~${typeof i === 'string' ? i : i.name}`,
             );
 
             // Only keep items allowed in the collection:
 
-            collectionsIndex[c].items = collectionsIndex[c].items.filter(
+            meta.items = meta.items.filter(
                 (i) =>
                     _isArray(i.tags) && i.tags.reduce((acc, t) => acc || idTags.includes(t), false),
             );
 
             // Remove all extra ids from the items:
 
-            collectionsIndex[c].items = collectionsIndex[c].items.map((i) => ({
+            meta.items = meta.items.map((i) => ({
                 ...i,
                 tags: i.tags.filter((t) => !_startsWith(t, 'id~') || idTags.includes(t)),
             }));
 
-            const idTagsMap = collectionsIndex[c].identifications.reduce((acc, i) => {
+            const idTagsMap = meta.identifications.reduce((acc, i) => {
                 if (typeof i === 'object' && i.name && _isArray(i.tags)) {
                     acc[`id~${i.name}`] = i.tags.map((t) => `tag~${t}`);
                 }
@@ -167,7 +165,7 @@ const build = (userDir) => {
             if (Object.keys(idTagsMap).length !== 0) {
                 // Add additional collection tags to items for each id:
 
-                collectionsIndex[c].items = collectionsIndex[c].items.map((i) => ({
+                meta.items = meta.items.map((i) => ({
                     ...i,
                     tags: _uniq(
                         i.tags.concat(
@@ -183,11 +181,11 @@ const build = (userDir) => {
             }
         }
 
-        if (_isArray(collectionsIndex[c].tags)) {
-            const tagsFilter = collectionsIndex[c].tags.map((t) => `tag~${t}`);
+        if (_isArray(meta.tags)) {
+            const tagsFilter = meta.tags.map((t) => `tag~${t}`);
 
-            if (_isArray(collectionsIndex[c].identifications)) {
-                collectionsIndex[c].identifications.forEach((i) => {
+            if (_isArray(meta.identifications)) {
+                meta.identifications.forEach((i) => {
                     if (typeof i === 'object' && _isArray(i.tags)) {
                         i.tags.forEach((t) => tagsFilter.push(`tag~${t}`));
                     }
@@ -196,23 +194,27 @@ const build = (userDir) => {
 
             // Remove tags not listed on the collection:
 
-            collectionsIndex[c].items = collectionsIndex[c].items.map((i) => ({
+            meta.items = meta.items.map((i) => ({
                 ...i,
                 tags: i.tags.filter((t) => !_startsWith(t, 'tag~') || tagsFilter.includes(t)),
             }));
         }
 
-        collectionsIndex[c].items = sortFeedItems(_uniqBy(collectionsIndex[c].items, 'id'));
+        meta.items = sortFeedItems(_uniqBy(meta.items, 'id'));
 
-        if (collectionsIndex[c].items.length !== 0) {
+        if (meta.items.length !== 0) {
             // Aggregate index:
 
             writeFiles({
                 userDir,
                 subDir: path.join('collections', dirStr(c), 'aggregate'),
-                feedItems: collectionsIndex[c].items,
-                _title: collectionsIndex[c].title,
-                _description: collectionsIndex[c].description,
+                feedItems: meta.items,
+                _title: meta.title,
+                _description: _stripTags(meta.description || ''),
+                _display: {
+                    ..._pick(meta.display || {}, ['sort_by', 'sort_order', 'start_tags']),
+                    description_html: markdown.render(_stripTags(meta.description || '')),
+                },
             });
         }
     });
@@ -231,7 +233,7 @@ const build = (userDir) => {
         subDir: 'collections',
         _title: 'Collections',
         metaCb: (c) => {
-            const collection = collectionsIndex[c];
+            const meta = collectionsIndex[c];
 
             const filePath = path.join(
                 userDir,
@@ -243,21 +245,18 @@ const build = (userDir) => {
 
             const id = new URL(path.join('.', filePath), contentHost).href;
 
-            const uniqTags = collection.items.reduce(
-                (acc, i) => _uniq([...acc, ...(i.tags || [])]),
-                [],
-            );
+            const uniqTags = meta.items.reduce((acc, i) => _uniq([...acc, ...(i.tags || [])]), []);
 
             return omitNull({
                 id,
                 url: `${appHost}items?i=${encodeURIComponent(id)}`,
-                title: collection.title,
+                title: meta.title,
                 _geo: omitNull({
-                    coordinates: coord([collection.longitude, collection.latitude]),
+                    coordinates: coord([meta.longitude, meta.latitude]),
                 }),
                 _meta: omitNull({
                     name: c,
-                    featured: collection.featured || null,
+                    featured: meta.featured || null,
                     idCount: uniqTags.filter((t) => _startsWith(t, 'id=')).length,
                     tagCount: uniqTags.filter((t) => _startsWith(t, 'tag=')).length,
                 }),
