@@ -4,16 +4,8 @@ import path from 'path';
 import glob from 'glob';
 import fs from 'fs';
 import yaml from 'js-yaml';
-import _startCase from 'lodash/startCase.js';
-import _uniq from 'lodash/uniq.js';
-import _uniqBy from 'lodash/uniqBy.js';
-import _pickBy from 'lodash/pickBy.js';
-import _mapValues from 'lodash/mapValues.js';
-import _isArray from 'lodash/isArray.js';
-import _pick from 'lodash/pick.js';
-import _startsWith from 'lodash/startsWith.js';
+import _ from 'lodash';
 import _stripTags from 'underscore.string/stripTags.js';
-import _upperFirst from 'lodash/upperFirst.js';
 import MarkdownIt from 'markdown-it';
 import dotenv from '../utils/dotenv.js';
 import omitNull from './utils/omitNull.js';
@@ -55,7 +47,7 @@ const build = (userDir) => {
             const meta = yaml.safeLoad(fs.readFileSync(path.join(collectionsDir, f)));
 
             collectionsIndex[name] = {
-                title: _upperFirst(name.replace(/_/g, ' ')),
+                title: _.upperFirst(name.replace(/_/g, ' ')),
                 ...meta,
                 items: [],
             };
@@ -76,7 +68,7 @@ const build = (userDir) => {
                 consoleLog('    ', name);
 
                 collectionsIndex[name] = {
-                    title: _upperFirst(name.replace(/_/g, ' ')),
+                    title: _.upperFirst(name.replace(/_/g, ' ')),
                     items: [],
                 };
             }
@@ -94,7 +86,7 @@ const build = (userDir) => {
 
         // Load in extra items manually added to the YAML file:
 
-        _uniq(meta.extra_items || []).forEach((e) => {
+        _.uniq(meta.extra_items || []).forEach((e) => {
             const [u, , ...f] = e.split(path.sep);
 
             consoleLog('      ', 'Extra:', e);
@@ -111,7 +103,7 @@ const build = (userDir) => {
 
         // Load in item indexes for each member:
 
-        _uniq([userDir, ...(meta.admins || []), ...(meta.members || [])]).forEach((m) => {
+        _.uniq([userDir, ...(meta.admins || []), ...(meta.members || [])]).forEach((m) => {
             let page = 1;
             let pageCount = 1;
             do {
@@ -134,9 +126,9 @@ const build = (userDir) => {
             } while (page <= pageCount);
         });
 
-        meta.items = _uniqBy(meta.items, 'id');
+        meta.items = _.uniqBy(meta.items, 'id');
 
-        if (_isArray(meta.identifications)) {
+        if (_.isArray(meta.identifications)) {
             const idTags = meta.identifications.map(
                 (i) => `id~${typeof i === 'string' ? i : i.name}`,
             );
@@ -145,18 +137,19 @@ const build = (userDir) => {
 
             meta.items = meta.items.filter(
                 (i) =>
-                    _isArray(i.tags) && i.tags.reduce((acc, t) => acc || idTags.includes(t), false),
+                    _.isArray(i.tags) &&
+                    i.tags.reduce((acc, t) => acc || idTags.includes(t), false),
             );
 
             // Remove all extra ids from the items:
 
             meta.items = meta.items.map((i) => ({
                 ...i,
-                tags: i.tags.filter((t) => !_startsWith(t, 'id~') || idTags.includes(t)),
+                tags: i.tags.filter((t) => !_.startsWith(t, 'id~') || idTags.includes(t)),
             }));
 
             const idTagsMap = meta.identifications.reduce((acc, i) => {
-                if (typeof i === 'object' && i.name && _isArray(i.tags)) {
+                if (typeof i === 'object' && i.name && _.isArray(i.tags)) {
                     acc[`id~${i.name}`] = i.tags.map((t) => `tag~${t}`);
                 }
                 return acc;
@@ -167,7 +160,7 @@ const build = (userDir) => {
 
                 meta.items = meta.items.map((i) => ({
                     ...i,
-                    tags: _uniq(
+                    tags: _.uniq(
                         i.tags.concat(
                             i.tags.reduce((acc, t) => {
                                 if (idTagsMap[t]) {
@@ -181,12 +174,12 @@ const build = (userDir) => {
             }
         }
 
-        if (_isArray(meta.tags)) {
+        if (_.isArray(meta.tags)) {
             const tagsFilter = meta.tags.map((t) => `tag~${t}`);
 
-            if (_isArray(meta.identifications)) {
+            if (_.isArray(meta.identifications)) {
                 meta.identifications.forEach((i) => {
-                    if (typeof i === 'object' && _isArray(i.tags)) {
+                    if (typeof i === 'object' && _.isArray(i.tags)) {
                         i.tags.forEach((t) => tagsFilter.push(`tag~${t}`));
                     }
                 });
@@ -196,11 +189,11 @@ const build = (userDir) => {
 
             meta.items = meta.items.map((i) => ({
                 ...i,
-                tags: i.tags.filter((t) => !_startsWith(t, 'tag~') || tagsFilter.includes(t)),
+                tags: i.tags.filter((t) => !_.startsWith(t, 'tag~') || tagsFilter.includes(t)),
             }));
         }
 
-        meta.items = sortFeedItems(_uniqBy(meta.items, 'id'));
+        meta.items = sortFeedItems(_.uniqBy(meta.items, 'id'));
 
         if (meta.items.length !== 0) {
             // Aggregate index:
@@ -212,7 +205,7 @@ const build = (userDir) => {
                 _title: meta.title,
                 _description: _stripTags(meta.description || ''),
                 _display: {
-                    ..._pick(meta.display || {}, ['sort_by', 'sort_order', 'start_tags']),
+                    ..._.pick(meta.display || {}, ['sort_by', 'sort_order', 'start_tags']),
                     description_html: markdown.render(_stripTags(meta.description || '')),
                 },
             });
@@ -222,9 +215,9 @@ const build = (userDir) => {
     // Index of all collections (this must be AFTER aggregation for accurate counts):
 
     writeFilesIndex({
-        index: _pickBy(
-            _mapValues(
-                _pickBy(collectionsIndex, (i) => !i.hide),
+        index: _.pickBy(
+            _.mapValues(
+                _.pickBy(collectionsIndex, (i) => !i.hide),
                 'items',
             ),
             (i) => i.length !== 0,
@@ -245,7 +238,7 @@ const build = (userDir) => {
 
             const id = new URL(path.join('.', filePath), contentHost).href;
 
-            const uniqTags = meta.items.reduce((acc, i) => _uniq([...acc, ...(i.tags || [])]), []);
+            const uniqTags = meta.items.reduce((acc, i) => _.uniq([...acc, ...(i.tags || [])]), []);
 
             return omitNull({
                 id,
@@ -257,8 +250,8 @@ const build = (userDir) => {
                 _meta: omitNull({
                     name: c,
                     featured: meta.featured || null,
-                    idCount: uniqTags.filter((t) => _startsWith(t, 'id=')).length,
-                    tagCount: uniqTags.filter((t) => _startsWith(t, 'tag=')).length,
+                    idCount: uniqTags.filter((t) => _.startsWith(t, 'id=')).length,
+                    tagCount: uniqTags.filter((t) => _.startsWith(t, 'tag=')).length,
                 }),
             });
         },
@@ -286,14 +279,14 @@ const indexAll = () => {
 
     console.log(Object.keys(index).length, ' collections');
 
-    index = _mapValues(index, (i) => sortFeedItems(i));
+    index = _.mapValues(index, (i) => sortFeedItems(i));
 
     Object.keys(index).forEach((name) => {
         writeFiles({
             userDir: '_collections',
             subDir: name,
             feedItems: index[name],
-            _title: _startCase(name),
+            _title: _.startCase(name),
             _authorName: 'All Collections',
             _userUrl: `${appHost}collections`,
             _description: `All users for [${name}]`,
@@ -301,8 +294,10 @@ const indexAll = () => {
         });
     });
 
+    const itemCounts = _.mapValues(index, (ary) => _.max(_.map(ary, '_meta.itemCount')));
+
     writeFilesIndex({
-        index,
+        index: _.pickBy(index, (v, k) => itemCounts[k] >= 10),
         userDir: '_collections',
         subDir: '.',
         _title: 'All Collections',
@@ -314,10 +309,10 @@ const indexAll = () => {
             return omitNull({
                 id,
                 url: `${appHost}items?i=${encodeURIComponent(id)}`,
-                title: _startCase(name),
+                title: _.startCase(name),
                 _meta: omitNull({
                     featured: false, // TODO
-                    itemCount: 0,
+                    itemCount: itemCounts[name],
                     userCount: index[name].length,
                 }),
             });
