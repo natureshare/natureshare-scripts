@@ -134,7 +134,9 @@ async function fromCollectionYaml(filePath) {
     const doc = yaml.safeLoad(fs.readFileSync(filePath));
     const collection = path.basename(filePath, '.yaml');
     const dirPath = path.join(filePath, '..', '..', 'items', 'inaturalist', collection);
-    for (const id of _uniq(doc.inaturalist.map((i) => parseInt(i, 10)).filter(Boolean))) {
+    for (const id of _uniq(
+        doc.source_data.inaturalist.map((i) => parseInt(i, 10)).filter(Boolean),
+    )) {
         await downloadId({ id, collection, dirPath });
     }
     return 'Done';

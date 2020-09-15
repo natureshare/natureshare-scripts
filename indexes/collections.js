@@ -304,8 +304,10 @@ const indexAll = () => {
         _authorName: 'All Collections',
         _userUrl: `${appHost}collections`,
         metaCb: (name) => {
-            const id = new URL(path.join('.', '_collections', name, 'index.json'), contentHost)
-                .href;
+            const id =
+                index[name].length === 1
+                    ? index[name][0].id
+                    : new URL(path.join('.', '_collections', name, 'index.json'), contentHost).href;
             return omitNull({
                 id,
                 url: `${appHost}items?i=${encodeURIComponent(id)}`,
@@ -320,9 +322,7 @@ const indexAll = () => {
     });
 };
 
-if (process.argv.length === 3) {
-    build(process.argv[2]);
-} else {
+const buildAll = () => {
     glob.sync('*', { cwd })
         .filter(
             (f) =>
@@ -330,5 +330,11 @@ if (process.argv.length === 3) {
         )
         .slice(0, 100000)
         .forEach(build);
+};
+
+if (process.argv.length === 3) {
+    build(process.argv[2]);
+} else {
+    buildAll();
     indexAll();
 }
