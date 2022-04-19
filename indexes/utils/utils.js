@@ -2,6 +2,7 @@
 
 import path from 'path';
 import _orderBy from 'lodash/orderBy.js';
+import _round from 'lodash/round.js';
 import dotenv from '../../utils/dotenv.js';
 
 dotenv.config();
@@ -33,5 +34,5 @@ export const sortFeedItems = (items) =>
 
 export const coord = (ary) =>
     ary.reduce((acc, val) => acc && Boolean(parseFloat(val)), true)
-        ? ary.map((v) => Math.round(parseFloat(v) * 1000) / 1000)
+        ? ary.map((v) => _round(v, 6))
         : null;
